@@ -1,11 +1,77 @@
-[gd_scene format=3 uid="uid://c32dpmvcym35y"]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" uid="uid://fyxgv7akv54m" path="res://scenes/weapons/weapon.gd" id="1_weapon"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_Weapon"]
+
+animations = [{
+"frames": [],
+"loop": true,
+"name": &"idle_down",
+"speed": 7.0
+}, {
+"frames": [],
+"loop": true,
+"name": &"idle_left",
+"speed": 7.0
+}, {
+"frames": [],
+"loop": true,
+"name": &"idle_right",
+"speed": 7.0
+}, {
+"frames": [],
+"loop": true,
+"name": &"idle_up",
+"speed": 7.0
+}, {
+"frames": [],
+"loop": true,
+"name": &"run_down",
+"speed": 8.0
+}, {
+"frames": [],
+"loop": true,
+"name": &"run_left",
+"speed": 8.0
+}, {
+"frames": [],
+"loop": true,
+"name": &"run_right",
+"speed": 8.0
+}, {
+"frames": [],
+"loop": true,
+"name": &"run_up",
+"speed": 8.0
+}, {
+"frames": [],
+"loop": false,
+"name": &"shoot_down",
+"speed": 10.0
+}, {
+"frames": [],
+"loop": false,
+"name": &"shoot_left",
+"speed": 10.0
+}, {
+"frames": [],
+"loop": false,
+"name": &"shoot_right",
+"speed": 10.0
+}, {
+"frames": [],
+"loop": false,
+"name": &"shoot_up",
+"speed": 10.0
+}]
 
 [node name="Weapon" type="Node2D" unique_id=38612644]
 script = ExtResource("1_weapon")
 
 [node name="Sprite2D" type="AnimatedSprite2D" parent="." unique_id=521739454]
+sprite_frames = SubResource("SpriteFrames_Weapon")
+animation = &"idle_down"
 
 [node name="AttackPoint" type="Marker2D" parent="." unique_id=2111673310]
 position = Vector2(8, 0)

@@ -4,11 +4,17 @@ extends CharacterBody2D
 @export var sprint_speed: float = 100.0
 
 @onready var animated_sprite: AnimatedSprite2D = $MovimentSprite
+@onready var no_hands_sprite: AnimatedSprite2D = $MovimentSpriteNoHands
 @onready var weapon_holder: Node2D = $WeaponHolder
 
 var last_direction := Vector2.DOWN
 var is_attacking := false
 var equipped_weapon: Weapon = null
+
+
+func _ready() -> void:
+	# Inicializa a visibilidade dos sprites
+	update_sprite_visibility()
 
 
 func _physics_process(_delta: float) -> void:
@@ -49,19 +55,15 @@ func start_attack() -> void:
 	is_attacking = true
 	velocity = Vector2.ZERO
 
-	# Se houver arma equipada, usa o ataque da arma
+	var direction_name := get_direction_name(last_direction)
+
+	# Se houver arma equipada, usa o ataque da arma (sem punch)
 	if equipped_weapon:
-		equipped_weapon.attack()
-		# Por enquanto, mantém o punch como animação base.
-		# Futuramente, animações específicas de arma serão adicionadas.
-		var direction_name := get_direction_name(last_direction)
-		var animation_name := "punch_" + direction_name
-		animated_sprite.play(animation_name)
+		equipped_weapon.attack(direction_name)
 		return
 
-	var direction_name := get_direction_name(last_direction)
+	# Sem arma: usa punch
 	var animation_name := "punch_" + direction_name
-
 	animated_sprite.play(animation_name)
 
 
@@ -73,6 +75,12 @@ func _on_moviment_sprite_animation_finished() -> void:
 	if not animated_sprite.animation.begins_with("punch_"):
 		return
 
+	is_attacking = false
+	update_animation(false)
+
+
+func _on_weapon_attack_finished() -> void:
+	# Chamado quando a arma termina a animação de ataque
 	is_attacking = false
 	update_animation(false)
 
@@ -93,6 +101,17 @@ func update_animation(is_moving: bool) -> void:
 	var direction_name := get_direction_name(last_direction)
 	var state := "run" if is_moving else "idle"
 
+	# Se tiver arma, usa NoHands para o personagem e anima a arma
+	if equipped_weapon:
+		var no_hands_animation := state + "_" + direction_name
+		if no_hands_sprite.sprite_frames.has_animation(no_hands_animation):
+			if no_hands_sprite.animation != no_hands_animation:
+				no_hands_sprite.play(no_hands_animation)
+
+		equipped_weapon.play_movement_animation(state, direction_name)
+		return
+
+	# Sem arma: usa MovimentSprite normal
 	var animation_name := state + "_" + direction_name
 
 	if animated_sprite.animation != animation_name:
@@ -114,6 +133,14 @@ func get_direction_name(direction: Vector2) -> String:
 
 # --- Sistema de armas ---
 
+## Atualiza a visibilidade dos sprites com base na arma equipada.
+func update_sprite_visibility() -> void:
+	var has_weapon: bool = equipped_weapon != null
+
+	animated_sprite.visible = not has_weapon
+	no_hands_sprite.visible = has_weapon
+
+
 ## Equipa uma arma e a coloca no WeaponHolder.
 func equip_weapon(weapon: Weapon) -> void:
 	# Remove a arma atual, se houver
@@ -123,10 +150,23 @@ func equip_weapon(weapon: Weapon) -> void:
 	weapon_holder.add_child(weapon)
 	weapon.position = Vector2.ZERO
 
+	# Conecta o signal de ataque finalizado
+	if not weapon.attack_finished.is_connected(_on_weapon_attack_finished):
+		weapon.attack_finished.connect(_on_weapon_attack_finished)
+
+	update_sprite_visibility()
+	update_animation(false)
+
 
 ## Remove a arma equipada do WeaponHolder.
 func unequip_weapon() -> void:
 	if equipped_weapon:
+		if equipped_weapon.attack_finished.is_connected(_on_weapon_attack_finished):
+			equipped_weapon.attack_finished.disconnect(_on_weapon_attack_finished)
+
 		weapon_holder.remove_child(equipped_weapon)
 		equipped_weapon.queue_free()
 		equipped_weapon = null
+
+	update_sprite_visibility()
+	update_animation(false)

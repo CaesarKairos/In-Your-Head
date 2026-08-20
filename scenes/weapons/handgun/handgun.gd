@@ -5,11 +5,15 @@ extends Weapon
 
 
 func _ready() -> void:
+	super._ready()
+
 	weapon_name = "Handgun"
 	damage = 10
 	attack_cooldown = fire_rate
 
 
-func attack() -> void:
-	super.attack()
-	print("Handgun disparou!")
+func attack(direction: String = "right") -> void:
+	super.attack(direction)
+
+	if is_attacking:
+		print("Handgun disparou!")

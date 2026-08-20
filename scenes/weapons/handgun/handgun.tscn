@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://dise1myiyof8y"]
+
+[ext_resource type="Script" uid="uid://chtrfor1xjfda" path="res://scenes/weapons/handgun/handgun.gd" id="1_handgun"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_hnbr4"]
+
+[node name="Handgun" type="Node2D" unique_id=1283744170]
+script = ExtResource("1_handgun")
+
+[node name="Sprite2D" type="AnimatedSprite2D" parent="." unique_id=924636532]
+sprite_frames = SubResource("SpriteFrames_hnbr4")
+
+[node name="AttackPoint" type="Marker2D" parent="." unique_id=552060136]
+position = Vector2(8, 0)

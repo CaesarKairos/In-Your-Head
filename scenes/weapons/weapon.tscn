@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://c32dpmvcym35y"]
+
+[ext_resource type="Script" uid="uid://fyxgv7akv54m" path="res://scenes/weapons/weapon.gd" id="1_weapon"]
+
+[node name="Weapon" type="Node2D" unique_id=38612644]
+script = ExtResource("1_weapon")
+
+[node name="Sprite2D" type="AnimatedSprite2D" parent="." unique_id=521739454]
+
+[node name="AttackPoint" type="Marker2D" parent="." unique_id=2111673310]
+position = Vector2(8, 0)

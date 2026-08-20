@@ -4,9 +4,11 @@ extends CharacterBody2D
 @export var sprint_speed: float = 100.0
 
 @onready var animated_sprite: AnimatedSprite2D = $MovimentSprite
+@onready var weapon_holder: Node2D = $WeaponHolder
 
 var last_direction := Vector2.DOWN
 var is_attacking := false
+var equipped_weapon: Weapon = null
 
 
 func _physics_process(_delta: float) -> void:
@@ -46,6 +48,16 @@ func _physics_process(_delta: float) -> void:
 func start_attack() -> void:
 	is_attacking = true
 	velocity = Vector2.ZERO
+
+	# Se houver arma equipada, usa o ataque da arma
+	if equipped_weapon:
+		equipped_weapon.attack()
+		# Por enquanto, mantém o punch como animação base.
+		# Futuramente, animações específicas de arma serão adicionadas.
+		var direction_name := get_direction_name(last_direction)
+		var animation_name := "punch_" + direction_name
+		animated_sprite.play(animation_name)
+		return
 
 	var direction_name := get_direction_name(last_direction)
 	var animation_name := "punch_" + direction_name
@@ -98,3 +110,23 @@ func get_direction_name(direction: Vector2) -> String:
 		return "left"
 
 	return "right"
+
+
+# --- Sistema de armas ---
+
+## Equipa uma arma e a coloca no WeaponHolder.
+func equip_weapon(weapon: Weapon) -> void:
+	# Remove a arma atual, se houver
+	unequip_weapon()
+
+	equipped_weapon = weapon
+	weapon_holder.add_child(weapon)
+	weapon.position = Vector2.ZERO
+
+
+## Remove a arma equipada do WeaponHolder.
+func unequip_weapon() -> void:
+	if equipped_weapon:
+		weapon_holder.remove_child(equipped_weapon)
+		equipped_weapon.queue_free()
+		equipped_weapon = null

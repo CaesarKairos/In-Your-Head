@@ -80,14 +80,11 @@ func _on_moviment_sprite_animation_finished() -> void:
 
 
 func _on_weapon_attack_finished() -> void:
-	# Chamado quando a arma termina a animação de ataque
 	is_attacking = false
 	update_animation(false)
 
 
 func get_facing_direction(direction: Vector2) -> Vector2:
-	# Mantém apenas 4 direções para a animação.
-	# O movimento continua podendo ser diagonal.
 	if abs(direction.x) > abs(direction.y):
 		return Vector2.LEFT if direction.x < 0.0 else Vector2.RIGHT
 
@@ -101,7 +98,7 @@ func update_animation(is_moving: bool) -> void:
 	var direction_name := get_direction_name(last_direction)
 	var state := "run" if is_moving else "idle"
 
-	# Se tiver arma, usa NoHands para o personagem e anima a arma
+	# Se tiver arma, usar NoHands para o personagem e anima a arma
 	if equipped_weapon:
 		var no_hands_animation := state + "_" + direction_name
 		if no_hands_sprite.sprite_frames.has_animation(no_hands_animation):
@@ -109,6 +106,7 @@ func update_animation(is_moving: bool) -> void:
 				no_hands_sprite.play(no_hands_animation)
 
 		equipped_weapon.play_movement_animation(state, direction_name)
+		update_weapon_holder()
 		return
 
 	# Sem arma: usa MovimentSprite normal
@@ -131,6 +129,25 @@ func get_direction_name(direction: Vector2) -> String:
 	return "right"
 
 
+## Ajusta z_index, posição da empunhadura e sprite offset da arma.
+## A posição do Weapon representa o ponto de empunhadura (mão).
+## O sprite offset é aplicado internamente pela própria Weapon.
+func update_weapon_holder() -> void:
+	if not equipped_weapon:
+		return
+
+	var direction_name := get_direction_name(last_direction)
+
+	# Ordem de desenho: mirando para cima, a arma fica atrás do corpo.
+	if direction_name == "up":
+		weapon_holder.z_index = -1
+	else:
+		weapon_holder.z_index = 1
+
+	# A origem do Weapon = ponto da empunhadura (mão do personagem).
+	equipped_weapon.position = equipped_weapon.get_grip_offset(direction_name)
+
+
 # --- Sistema de armas ---
 
 ## Atualiza a visibilidade dos sprites com base na arma equipada.
@@ -143,18 +160,17 @@ func update_sprite_visibility() -> void:
 
 ## Equipa uma arma e a coloca no WeaponHolder.
 func equip_weapon(weapon: Weapon) -> void:
-	# Remove a arma atual, se houver
 	unequip_weapon()
 
 	equipped_weapon = weapon
 	weapon_holder.add_child(weapon)
 	weapon.position = Vector2.ZERO
 
-	# Conecta o signal de ataque finalizado
 	if not weapon.attack_finished.is_connected(_on_weapon_attack_finished):
 		weapon.attack_finished.connect(_on_weapon_attack_finished)
 
 	update_sprite_visibility()
+	update_weapon_holder()
 	update_animation(false)
 
 

@@ -498,9 +498,7 @@ script = ExtResource("1_handgun")
 
 [node name="Sprite2D" type="AnimatedSprite2D" parent="." unique_id=924636532]
 sprite_frames = SubResource("SpriteFrames_Handgun")
-animation = &"shoot_up"
-frame = 2
-frame_progress = 1.0
+animation = &"idle_down"
 
 [node name="AttackPoint" type="Marker2D" parent="." unique_id=552060136]
 position = Vector2(8, 0)

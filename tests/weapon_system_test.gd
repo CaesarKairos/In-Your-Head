@@ -59,7 +59,54 @@ func _run_tests() -> void:
 				_errors.append("handgun.tscn não possui AttackPoint")
 			handgun.free()
 
-	# 3. Verifica se o WeaponPickup carrega
+	# 3. Valida os offsets calibrados da Handgun (nao podem ser alterados por
+	#    "simetria" - sao derivados do pixel real de cada textura).
+	var handgun_offsets: Node = null
+	if handgun_scene == null:
+		_errors.append("Falha ao carregar handgun.tscn (necessario para validar offsets)")
+	else:
+		handgun_offsets = handgun_scene.instantiate()
+		# _ready() so roda apos entrar na arvore; os offsets sao populados nele.
+		root.add_child(handgun_offsets)
+	if handgun_offsets:
+		# grip_offsets: validados contra a posicao real da mao no corpo.
+		var expected_grip := {
+			"down": Vector2(0, 4),
+			"up": Vector2(0, 4),
+			"left": Vector2(-2, 3),
+			"right": Vector2(2, 3),
+		}
+		for dir_name in expected_grip:
+			if handgun_offsets.get_grip_offset(dir_name) != expected_grip[dir_name]:
+				_errors.append("grip_offset de '%s' divergiu (esperado %s)" % [dir_name, expected_grip[dir_name]])
+
+		# sprite_offsets derivados das texturas (tools/analyze_hand_regions.py):
+		# DOWN mão (pele) em linhas 4..9 -> +4.0; UP mãos em dois blocos -> -4.0.
+		var expected_sprite := {
+			"down": Vector2(0, 4),
+			"up": Vector2(0, -4),
+			"left": Vector2(0, 0),
+			"right": Vector2(0, 0),
+		}
+		for dir_name in expected_sprite:
+			if handgun_offsets.sprite_offsets[dir_name] != expected_sprite[dir_name]:
+				_errors.append("sprite_offsets[%s] != %s" % [dir_name, expected_sprite[dir_name]])
+
+		# sprite_offsets_by_state: frames de tiro NAO crescem simetricamente.
+		# shoot_up precisa de -5.5 pois o recoil desce o conteudo no frame 0
+		# e o usuario confirmou que -4.5 ainda mostrava a arma entre as pernas.
+		var expected_state := {
+			"shoot_down": Vector2(0, 4),
+			"shoot_up": Vector2(0, -5.5),
+			"shoot_left": Vector2(0, 0),
+			"shoot_right": Vector2(0, 0),
+		}
+		for key in expected_state:
+			if handgun_offsets.sprite_offsets_by_state[key] != expected_state[key]:
+				_errors.append("sprite_offsets_by_state[%s] != %s" % [key, expected_state[key]])
+		handgun_offsets.free()
+
+	# 4. Verifica se o WeaponPickup carrega
 	var pickup_scene: PackedScene = load("res://scenes/weapons/weapon_pickup.tscn")
 	if pickup_scene == null:
 		_errors.append("Falha ao carregar weapon_pickup.tscn")

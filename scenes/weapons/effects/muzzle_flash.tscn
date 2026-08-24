@@ -1,0 +1,122 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scenes/weapons/effects/muzzle_flash.gd" id="1_flash"]
+[ext_resource type="Texture2D" path="res://assets/characters/player/Guns/Fire/Fire_Up-Sheet3.png" id="2_fup"]
+[ext_resource type="Texture2D" path="res://assets/characters/player/Guns/Fire/Fire_Down-Sheet3.png" id="3_fdown"]
+[ext_resource type="Texture2D" path="res://assets/characters/player/Guns/Fire/Fire_side-Sheet3.png" id="4_fside"]
+[ext_resource type="Texture2D" path="res://assets/characters/player/Guns/Fire/Fire_side-left-Sheet3.png" id="5_fleft"]
+
+[sub_resource type="AtlasTexture" id="Atlas_fup0"]
+atlas = ExtResource("2_fup")
+region = Rect2(0, 0, 7, 10)
+
+[sub_resource type="AtlasTexture" id="Atlas_fup1"]
+atlas = ExtResource("2_fup")
+region = Rect2(7, 0, 7, 10)
+
+[sub_resource type="AtlasTexture" id="Atlas_fup2"]
+atlas = ExtResource("2_fup")
+region = Rect2(14, 0, 7, 10)
+
+[sub_resource type="AtlasTexture" id="Atlas_fdown0"]
+atlas = ExtResource("3_fdown")
+region = Rect2(0, 0, 7, 10)
+
+[sub_resource type="AtlasTexture" id="Atlas_fdown1"]
+atlas = ExtResource("3_fdown")
+region = Rect2(7, 0, 7, 10)
+
+[sub_resource type="AtlasTexture" id="Atlas_fdown2"]
+atlas = ExtResource("3_fdown")
+region = Rect2(14, 0, 7, 10)
+
+[sub_resource type="AtlasTexture" id="Atlas_fside0"]
+atlas = ExtResource("4_fside")
+region = Rect2(0, 0, 10, 7)
+
+[sub_resource type="AtlasTexture" id="Atlas_fside1"]
+atlas = ExtResource("4_fside")
+region = Rect2(10, 0, 10, 7)
+
+[sub_resource type="AtlasTexture" id="Atlas_fside2"]
+atlas = ExtResource("4_fside")
+region = Rect2(20, 0, 10, 7)
+
+[sub_resource type="AtlasTexture" id="Atlas_fleft0"]
+atlas = ExtResource("5_fleft")
+region = Rect2(0, 0, 10, 7)
+
+[sub_resource type="AtlasTexture" id="Atlas_fleft1"]
+atlas = ExtResource("5_fleft")
+region = Rect2(10, 0, 10, 7)
+
+[sub_resource type="AtlasTexture" id="Atlas_fleft2"]
+atlas = ExtResource("5_fleft")
+region = Rect2(20, 0, 10, 7)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_flash"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("Atlas_fup0")
+}, {
+"duration": 1.0,
+"texture": SubResource("Atlas_fup1")
+}, {
+"duration": 1.0,
+"texture": SubResource("Atlas_fup2")
+}],
+"loop": false,
+"name": &"up",
+"speed": 14.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("Atlas_fdown0")
+}, {
+"duration": 1.0,
+"texture": SubResource("Atlas_fdown1")
+}, {
+"duration": 1.0,
+"texture": SubResource("Atlas_fdown2")
+}],
+"loop": false,
+"name": &"down",
+"speed": 14.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("Atlas_fside0")
+}, {
+"duration": 1.0,
+"texture": SubResource("Atlas_fside1")
+}, {
+"duration": 1.0,
+"texture": SubResource("Atlas_fside2")
+}],
+"loop": false,
+"name": &"right",
+"speed": 14.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("Atlas_fleft0")
+}, {
+"duration": 1.0,
+"texture": SubResource("Atlas_fleft1")
+}, {
+"duration": 1.0,
+"texture": SubResource("Atlas_fleft2")
+}],
+"loop": false,
+"name": &"left",
+"speed": 14.0
+}]
+
+[node name="MuzzleFlash" type="Node2D"]
+script = ExtResource("1_flash")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+visible = false
+sprite_frames = SubResource("SpriteFrames_flash")
+animation = &"up"

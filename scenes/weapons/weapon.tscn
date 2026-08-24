@@ -1,9 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene format=3 uid="uid://c60vjlqwwlfqp"]
 
 [ext_resource type="Script" uid="uid://fyxgv7akv54m" path="res://scenes/weapons/weapon.gd" id="1_weapon"]
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_Weapon"]
-
 animations = [{
 "frames": [],
 "loop": true,
@@ -24,6 +23,26 @@ animations = [{
 "loop": true,
 "name": &"idle_up",
 "speed": 7.0
+}, {
+"frames": [],
+"loop": true,
+"name": &"reload_down",
+"speed": 5.0
+}, {
+"frames": [],
+"loop": true,
+"name": &"reload_left",
+"speed": 5.0
+}, {
+"frames": [],
+"loop": true,
+"name": &"reload_right",
+"speed": 5.0
+}, {
+"frames": [],
+"loop": true,
+"name": &"reload_up",
+"speed": 5.0
 }, {
 "frames": [],
 "loop": true,
@@ -71,7 +90,7 @@ script = ExtResource("1_weapon")
 
 [node name="Sprite2D" type="AnimatedSprite2D" parent="." unique_id=521739454]
 sprite_frames = SubResource("SpriteFrames_Weapon")
-animation = &"idle_down"
+animation = &"reload_up"
 
-[node name="AttackPoint" type="Marker2D" parent="." unique_id=2111673310]
+[node name="MuzzlePoint" type="Marker2D" parent="." unique_id=2111673310]
 position = Vector2(8, 0)

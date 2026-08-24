@@ -1,14 +1,33 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/characters/player/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/weapons/weapon_pickup.tscn" id="2_pickup"]
-[ext_resource type="PackedScene" path="res://scenes/weapons/handgun/handgun.tscn" id="3_handgun"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/gun/gun.tscn" id="3_gun"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/pistol/pistol.tscn" id="4_pistol"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/shotgun/shotgun.tscn" id="5_shotgun"]
+
+[sub_resource type="RectangleShape2D" id="Rect_wall"]
+size = Vector2(60, 24)
 
 [node name="World" type="Node2D"]
 
 [node name="Player" parent="." instance=ExtResource("1_player")]
 position = Vector2(100, 100)
 
-[node name="HandgunPickup" parent="." instance=ExtResource("2_pickup")]
+[node name="GunPickup" parent="." instance=ExtResource("2_pickup")]
 position = Vector2(140, 100)
-weapon_scene = ExtResource("3_handgun")
+weapon_scene = ExtResource("3_gun")
+
+[node name="PistolPickup" parent="." instance=ExtResource("2_pickup")]
+position = Vector2(140, 140)
+weapon_scene = ExtResource("4_pistol")
+
+[node name="ShotgunPickup" parent="." instance=ExtResource("2_pickup")]
+position = Vector2(180, 140)
+weapon_scene = ExtResource("5_shotgun")
+
+[node name="Wall" type="StaticBody2D" parent="."]
+position = Vector2(220, 100)
+
+[node name="WallShape" type="CollisionShape2D" parent="Wall"]
+shape = SubResource("Rect_wall")

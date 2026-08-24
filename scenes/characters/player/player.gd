@@ -18,6 +18,10 @@ func _ready() -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	# Recarga (a lógica pertence a la Weapon).
+	if Input.is_action_just_pressed("reload") and equipped_weapon:
+		equipped_weapon.reload()
+
 	# Ataque
 	if Input.is_action_just_pressed("attack") and not is_attacking:
 		start_attack()
@@ -52,17 +56,19 @@ func _physics_process(_delta: float) -> void:
 
 
 func start_attack() -> void:
-	is_attacking = true
-	velocity = Vector2.ZERO
-
 	var direction_name := get_direction_name(last_direction)
 
-	# Se houver arma equipada, usa o ataque da arma (sem punch)
+	# Arma equipada: o ataque o realiza a Weapon. is_attacking só se ativa
+	# se o disparo comezó de verdade (evita bloqueos com recarga/sen munición).
 	if equipped_weapon:
-		equipped_weapon.attack(direction_name)
+		if equipped_weapon.attack(direction_name):
+			is_attacking = true
+			velocity = Vector2.ZERO
 		return
 
 	# Sem arma: usa punch
+	is_attacking = true
+	velocity = Vector2.ZERO
 	var animation_name := "punch_" + direction_name
 	animated_sprite.play(animation_name)
 

@@ -8,9 +8,6 @@ var player_in_range: Node = null
 
 
 func _ready() -> void:
-	body_entered.connect(_on_body_entered)
-	body_exited.connect(_on_body_exited)
-
 	update_pickup_visual()
 
 

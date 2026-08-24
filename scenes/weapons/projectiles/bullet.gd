@@ -1,14 +1,14 @@
 class_name Bullet
 extends CharacterBody2D
 
-## Proyectil reutilizable e xenérico. Nace na boca do cano, viaxa en liña recta
-## e libérase ao colidir ou superar a distancia máxima.
-## É independiente do Player despois de crearse.
-## A textura, o dano e a distancia máxima chegan da Weapon en setup().
+## Projétil reutilizável e genérico. Nasce na boca do cano, viaja em linha reta
+## e se libera ao colidir ou superar a distância máxima.
+## É independente do Player depois de ser criada.
+## A textura, o dano e a distância máxima vêm da Weapon em setup().
 
 @export var speed: float = 280.0
 
-# Cargados pola Weapon en setup() (non son globais).
+# Carregados pela Weapon em setup() (não são globais).
 var damage: int = 0
 var max_distance: float = 0.0
 
@@ -18,13 +18,13 @@ var _active := false
 
 @onready var body_sprite: Sprite2D = $Sprite
 
-# Corpo que disparou esta bala (excepción de colisión para non ferirse).
+# Corpo que disparou esta bala (exceção de colisão para não se ferir).
 var _shooter: CharacterBody2D = null
 
-## Prepara a bala cando a Weapon a instancia no MuzzlePoint.
-## A textura, a distancia máxima e quen a disparou (corpo pai) proveñen da arma.
-## shooter serve para engadir unha excepción de colisión: a bala non debe
-## colidir co corpo que a creou (o Player), aínda que naza moi preto del.
+## Prepara a bala quando a Weapon a instancia no MuzzlePoint.
+## A textura, a distância máxima e quem a disparou (corpo pai) vêm da arma.
+## shooter serve para adicionar uma exceção de colisão: a bala não deve
+## colidir com o corpo que a criou (o Player), mesmo nascendo bem perto dele.
 func setup(initial_position: Vector2, aim_dir: Vector2, shot_damage: int, bullet_texture: Texture2D, proj_max_distance: float, shooter: CharacterBody2D = null) -> void:
     position = initial_position
     direction = aim_dir.normalized()
@@ -48,7 +48,7 @@ func _physics_process(delta: float) -> void:
         queue_free()
         return
 
-    # Detecta colision directa da bala (é un CharacterBody2D).
+    # Detecta colisão direta da bala (é um CharacterBody2D).
     var collision := move_and_collide(direction * speed * delta)
     if collision:
         var hit := collision.get_collider()
@@ -58,7 +58,7 @@ func _physics_process(delta: float) -> void:
 
     update_sprite_rotation()
 
-## Rota/voltea o sprite para que a bala apunte cara a onde vai.
+## Rotaciona/vira o sprite para que a bala aponte para onde vai.
 func update_sprite_rotation() -> void:
     if not body_sprite:
         return

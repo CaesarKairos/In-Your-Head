@@ -1,8 +1,8 @@
 extends Node2D
 
-## Test: a bala e o muzzle flash non deben impactar co Player que a disparou
-## e, ao mirar cara arriba, debuxaranse na mesma capa (z_index) que a arma
-## (detrás do corpo). Recrea Player > WeaponHolder > Weapon.
+## Teste: a bala e o muzzle flash não devem impactar o Player que a disparou
+## e, ao mirar para cima, são desenhados na mesma camada (z_index) que a arma
+## (atrás do corpo). Recria Player > WeaponHolder > Weapon.
 
 var _failures: Array[String] = []
 var _player: CharacterBody2D
@@ -40,7 +40,7 @@ func _ready() -> void:
             found = true
             break
     if not found:
-        _failures.append("non se creou nin bala nin muzzle flash")
+        _failures.append("não foi criada nem bala nem muzzle flash")
 
     await _wait(20)
     _finish()
@@ -58,7 +58,7 @@ func _check_spawns() -> bool:
             any = true
             var shooter: Node = b.get("_shooter")
             if shooter != _player:
-                _failures.append("a bala non rexistrou o shooter correcto")
+                _failures.append("a bala não registrou o shooter correto")
             if b.z_index != _holder.z_index:
                 _failures.append("bala z_index distinto da arma")
     return any

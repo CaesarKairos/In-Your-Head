@@ -1,8 +1,8 @@
 extends Node2D
 
-## Test determinista do sistema de armas.
-## 1) Cada arma exporta a súa propia textura de proxectil e alcance.
-## 2) Bullet.setup() aplica textura, dano e alcance que recibe da Weapon.
+## Teste determinístico do sistema de armas.
+## 1) Cada arma exporta a própria textura de projétil e alcance.
+## 2) Bullet.setup() aplica a textura, o dano e o alcance recebidos da Weapon.
 
 var _failures: Array[String] = []
 
@@ -19,7 +19,7 @@ func _ready() -> void:
 func _check_weapon_now(path: String, nm: String, tex_path: String, dist: float, dmg: int) -> void:
     var scene: PackedScene = load(path)
     if scene == null:
-        _failures.append(nm + " non cargou")
+        _failures.append(nm + " não carregou")
         return
     var w: Node = scene.instantiate()
     add_child(w)
@@ -27,20 +27,20 @@ func _check_weapon_now(path: String, nm: String, tex_path: String, dist: float, 
     var tex: Texture2D = w.get("projectile_texture")
     var rp: String = tex.resource_path if tex else "NULL"
     if rp != tex_path:
-        _failures.append(nm + ": projectile_texture incorrecto (" + rp + ")")
+        _failures.append(nm + ": projectile_texture incorreto (" + rp + ")")
     var dist_val: float = w.get("projectile_max_distance")
     if absf(dist_val - dist) > 0.01:
-        _failures.append(nm + ": projectile_max_distance incorrecto (" + str(dist_val) + ")")
+        _failures.append(nm + ": projectile_max_distance incorreto (" + str(dist_val) + ")")
     var dmg_val: int = w.get("damage")
     if dmg_val != dmg:
-        _failures.append(nm + ": damage incorrecto (" + str(dmg_val) + ")")
+        _failures.append(nm + ": damage incorreto (" + str(dmg_val) + ")")
     w.free()
 
 
 func _check_bullet_setup() -> void:
     var scene: PackedScene = load("res://scenes/weapons/projectiles/bullet.tscn")
     if scene == null:
-        _failures.append("non se puido cargar bullet.tscn")
+        _failures.append("não foi possível carregar bullet.tscn")
         return
     var b: Bullet = scene.instantiate()
     add_child(b)
@@ -49,18 +49,18 @@ func _check_bullet_setup() -> void:
     b.setup(Vector2.ZERO, Vector2.RIGHT, 7, tex, 1234.5)
     await get_tree().process_frame
     if absf(b.max_distance - 1234.5) > 0.01:
-        _failures.append("Bullet.max_distance non aplicado polo setup")
+        _failures.append("Bullet.max_distance não aplicado pelo setup")
     if b.damage != 7:
-        _failures.append("Bullet.damage non aplicado polo setup")
+        _failures.append("Bullet.damage não aplicado pelo setup")
     var sprite: Sprite2D = null
     for cc in b.get_children():
         if cc is Sprite2D:
             sprite = cc as Sprite2D
     if sprite and sprite.texture:
         if sprite.texture.resource_path != "res://assets/characters/player/Guns/Bullets/Pistol-bullet_Bullet.png":
-            _failures.append("Bullet.texture non aplicado polo setup")
+            _failures.append("Bullet.texture não aplicado pelo setup")
     else:
-        _failures.append("Bullet sen sprite ou textura tras setup")
+        _failures.append("Bullet sem sprite ou textura após setup")
     b.free()
 
 

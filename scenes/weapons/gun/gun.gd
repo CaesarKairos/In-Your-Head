@@ -13,11 +13,11 @@ func _ready() -> void:
     attack_cooldown = fire_rate
     reload_time = 1.25
 
-    # Escenas reutilizables de proyectil e destello de boca.
+    # Cenas reutilizáveis de projétil e clarão de boca.
     bullet_scene = load("res://scenes/weapons/projectiles/bullet.tscn") as PackedScene
     muzzle_flash_scene = load("res://scenes/weapons/effects/muzzle_flash.tscn") as PackedScene
 
-    # Proyectil (textura) e alcance máximo deste arma.
+    # Projétil (textura) e alcance máximo desta arma.
     projectile_texture = load("res://assets/characters/player/Guns/Bullets/Gun-bullet_Bullet.png") as Texture2D
     projectile_max_distance = 1400.0
 
@@ -44,8 +44,8 @@ func _ready() -> void:
         "shoot_right": Vector2(0, 0),
     }
 
-    # Boca do cano por direccion. Nos laterais corrixese o ~1-2 px abaixo
-    # (y=-2 empuxa cara cima).
+    # Boca do cano por direção. Nos laterais corrige-se o ~1-2 px abaixo
+    # (y=-2 empurra para cima).
     muzzle_offsets = {
         "down": Vector2(0, 12),
         "up": Vector2(0, -14),
@@ -53,7 +53,7 @@ func _ready() -> void:
         "right": Vector2(8, -2),
     }
 
-    # Sincroniza a composicion visual inicial.
+    # Sincroniza a composição visual inicial.
     update_visual(get_direction_from_animation(animated_sprite.animation))
     update_muzzle(current_direction)
 

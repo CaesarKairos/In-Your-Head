@@ -8,12 +8,12 @@ signal reload_finished
 @export var damage: int = 1
 @export var attack_cooldown: float = 0.5
 
-## Capacidad del cargador (lo define el arma concreta).
+## Capacidade do carregador (definida pela arma concreta).
 @export var magazine_size: int = 6
-## Municion actual dentro del cargador.
+## Munição atual dentro do carregador.
 @export var current_ammo: int = 6
-## Tiempo configurable de recarga. La finalizacion visual esta sincronizada
-## con la animacion reload_<direccion> (no se usa un Timer aparte).
+## Tempo configurável de recarga. A finalização visual está sincronizada
+## com a animação reload_<direção> (não é usado um Timer separado).
 @export var reload_time: float = 1.25
 
 ## Posicao da empunhadura da arma em relacao ao Player (preenchido pelo Player).
@@ -32,16 +32,16 @@ signal reload_finished
 ## Usado quando os sprites de ataque tem dimensoes diferentes dos de movimento.
 @export var sprite_offsets_by_state := {}
 
-## Posicion de la boca del cano (MuzzlePoint) por direccion, en coords locales.
+## Posição da boca do cano (MuzzlePoint) por direção, em coordenadas locais.
 @export var muzzle_offsets := {}
 
-## Escenas reutilizables para el proyectil y el destello de bocanada.
+## Cenas reutilizáveis para o projétil e o clarão de boca.
 @export var bullet_scene: PackedScene
 @export var muzzle_flash_scene: PackedScene
 
-## Textura do proxectil creado por esta arma (Bullet non ten textura fixa).
+## Textura do projétil criado por esta arma (Bullet não tem textura fixa).
 @export var projectile_texture: Texture2D
-## Alcance máximo do proxectil desta arma (px). Pertence á arma, non ao Bullet.
+## Alcance máximo do projétil desta arma (px). Pertence à arma, não ao Bullet.
 @export var projectile_max_distance: float = 1400.0
 
 @onready var animated_sprite: AnimatedSprite2D = $Sprite2D
@@ -51,14 +51,14 @@ var is_attacking: bool = false
 var is_reloading: bool = false
 var current_direction := "right"
 
-# Marca de tiempo del ultimo disparo (ms) para el cooldown.
+# Marca de tempo do último disparo (ms) para o cooldown.
 var _last_shot_at: int = -1000000
 
 
 func _ready() -> void:
 	animated_sprite.animation_finished.connect(_on_animation_finished)
 
-	# Garante que a composicao visible inicial esta sincronizada.
+	# Garante que a composição visível inicial está sincronizada.
 	update_visual(get_direction_from_animation(animated_sprite.animation))
 	update_muzzle(current_direction)
 
@@ -85,7 +85,7 @@ func update_visual(direction: String, state: String = "") -> void:
 	animated_sprite.position = get_sprite_offset(direction, state)
 
 
-## Actualiza la posicion local del MuzzlePoint segun la direccion actual.
+## Atualiza a posição local do MuzzlePoint segundo a direção atual.
 func update_muzzle(direction: String) -> void:
 	current_direction = direction
 	if muzzle_point:
@@ -108,7 +108,7 @@ func play_movement_animation(state: String, direction: String) -> void:
 	if animated_sprite.animation != animation_name:
 		animated_sprite.play(animation_name)
 
-	# Sincroniza a correcao visual com o estado/direcao atual.
+	# Sincroniza a correção visual com o estado/direção atual.
 	update_visual(direction, state)
 
 
@@ -122,7 +122,7 @@ func attack(direction: String = "right") -> bool:
 	# Respetar o cooldown de disparo.
 	if Time.get_ticks_msec() - _last_shot_at < int(attack_cooldown * 1000.0):
 		return false
-	# Sino municion: nao dispara, nao cria bala nem destello (so aviso).
+	# Sem munição: não dispara, não cria bala nem clarão (só aviso).
 	if current_ammo <= 0:
 		print(weapon_name + ": sem munição. Pressione R para recarregar.")
 		return false
@@ -145,7 +145,7 @@ func attack(direction: String = "right") -> bool:
 	animated_sprite.play(animation_name)
 	update_visual(direction, "shoot")
 
-	# A bala e o destello nacen na boca do cano ao inicio do disparo.
+	# A bala e o clarão nascem na boca do cano no início do disparo.
 	spawn_projectile(direction)
 	spawn_muzzle_flash(direction)
 	return true
@@ -159,7 +159,7 @@ func finish_attack() -> void:
 	attack_finished.emit()
 
 
-## Crea a bala na posicion global do MuzzlePoint, independente do Player.
+## Cria a bala na posição global do MuzzlePoint, independente do Player.
 func spawn_projectile(direction: String) -> void:
 	if not bullet_scene or not muzzle_point:
 		return
@@ -168,7 +168,7 @@ func spawn_projectile(direction: String) -> void:
 	if not bullet:
 		return
 
-	# Debuxase na mesma capa que a arma (detrás do corpo ao mirar cara arriba).
+	# Desenha-se na mesma camada que a arma (atrás do corpo ao mirar para cima).
 	bullet.z_index = _get_weapon_z_index()
 
 	var scene := get_tree().current_scene
@@ -181,8 +181,8 @@ func spawn_projectile(direction: String) -> void:
 	bullet.call_deferred("setup", muzzle_point.global_position, direction_vector(direction), damage, projectile_texture, projectile_max_distance, _get_owner_body())
 
 
-## Sube pola árbore até atopar o CharacterBody2D que empuña esta arma.
-## A bala usa esta excepción para non colidir co corpo que a disparou (o Player).
+## Sobe pela árvore até encontrar o CharacterBody2D que empunha esta arma.
+## A bala usa esta exceção para não colidir com o corpo que a disparou (o Player).
 func _get_owner_body() -> CharacterBody2D:
 	var node := get_parent()
 	while node:
@@ -191,9 +191,9 @@ func _get_owner_body() -> CharacterBody2D:
 		node = node.get_parent()
 	return null
 
-## Índice de orde de debuxo (z_index) da arma portadora actual.
-## O muzzle flash e mais a bala deben debuxarse na mesma capa que a arma:
-## ao mirar cara arriba a arma queda detrás do corpo, oracle que o flash tamén.
+## Índice de ordem de desenho (z_index) da arma portadora atual.
+## O muzzle flash e a bala devem ser desenhados na mesma camada que a arma:
+## ao mirar para cima a arma fica atrás do corpo, logo o flash também.
 func _get_weapon_z_index() -> int:
 	var holder := get_parent()
 	if holder:
@@ -208,7 +208,7 @@ func spawn_muzzle_flash(direction: String) -> void:
 	if not flash:
 		return
 
-	# O flash debe debuxarse na mesma capa que a da arma (atrás ao mirar arriba).
+	# O flash deve ser desenhado na mesma camada da arma (atrás ao mirar para cima).
 	flash.z_index = _get_weapon_z_index()
 
 	var scene := get_tree().current_scene
@@ -221,7 +221,7 @@ func spawn_muzzle_flash(direction: String) -> void:
 	flash.call_deferred("flash", direction)
 
 
-## Solicita a recarga. A lojica completa pertence a la Weapon, non ao Player.
+## Solicita a recarga. A lógica completa pertence à Weapon, não ao Player.
 func reload() -> void:
 	if is_reloading:
 		return
@@ -246,7 +246,7 @@ func start_reload(direction: String) -> void:
 	print(weapon_name + ": recarregando...")
 
 
-## Prepara o cargador e emite o signal de recarga terminada.
+## Prepara o carregador e emite o signal de recarga terminada.
 func finish_reload() -> void:
 	if not is_reloading:
 		return
@@ -257,7 +257,7 @@ func finish_reload() -> void:
 	play_movement_animation("idle", current_direction)
 
 
-## Devolve o vector cardinal da direccion de disparo.
+## Devolve o vetor cardinal da direção de disparo.
 func direction_vector(direction: String) -> Vector2:
 	match direction:
 		"up":
@@ -277,7 +277,7 @@ func _on_animation_finished() -> void:
 		finish_reload()
 
 
-## Extrai a direcao (up/down/left/right) do nome de uma animacao.
+## Extrai a direção (up/down/left/right) do nome de uma animação.
 func get_direction_from_animation(animation: String) -> String:
 	if animation.ends_with("_up"):
 		return "up"

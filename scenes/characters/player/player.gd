@@ -18,7 +18,7 @@ func _ready() -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	# Recarga (a lógica pertence a la Weapon).
+	# Recarga (a lógica pertence à Weapon).
 	if Input.is_action_just_pressed("reload") and equipped_weapon:
 		equipped_weapon.reload()
 
@@ -58,8 +58,8 @@ func _physics_process(_delta: float) -> void:
 func start_attack() -> void:
 	var direction_name := get_direction_name(last_direction)
 
-	# Arma equipada: o ataque o realiza a Weapon. is_attacking só se ativa
-	# se o disparo comezó de verdade (evita bloqueos com recarga/sen munición).
+	# Arma equipada: o ataque é realizado pela Weapon. is_attacking só é ativado
+	# se o disparo começou de verdade (evita bloqueios com recarga/sem munição).
 	if equipped_weapon:
 		if equipped_weapon.attack(direction_name):
 			is_attacking = true

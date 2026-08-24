@@ -17,7 +17,7 @@ func _ready() -> void:
     projectile_texture = load("res://assets/characters/player/Guns/Bullets/Pistol-bullet_Bullet.png") as Texture2D
     projectile_max_distance = 1100.0
 
-    # Empunhadura = man do personaxe (mesma posicion que Gun).
+    # Empunhadura = mão do personagem (mesma posição que a Gun).
     grip_offset = Vector2(0, 4)
     grip_offsets = {
         "down": Vector2(0, 4),
@@ -26,7 +26,7 @@ func _ready() -> void:
         "right": Vector2(2, 3),
     }
 
-    # Encaixe visual estimado da Pistol (arte menor que a Gun); axustar no editor.
+    # Encaixe visual estimado da Pistol (arte menor que a Gun); ajustar no editor.
     sprite_offsets = {
         "down": Vector2(0, 2),
         "up": Vector2(0, -2),
@@ -41,7 +41,7 @@ func _ready() -> void:
         "shoot_right": Vector2(0, 0),
     }
 
-    # Boca do cano estimada da Pistol; axustar visualmente no editor.
+    # Boca do cano estimada da Pistol; ajustar visualmente no editor.
     muzzle_offsets = {
         "down": Vector2(0, 8),
         "up": Vector2(0, -10),

@@ -1,8 +1,8 @@
 class_name Shotgun
 extends Weapon
 
-# Shotgun: por agora un único proxectil para validar a arquitectura.
-# Non implementa ainda máquina de recarga por cartuchos nin spread.
+# Shotgun: por enquanto um único projétil para validar a arquitetura.
+# Não implementa ainda máquina de recarga por cartuchos nem spread.
 
 func _ready() -> void:
     super._ready()

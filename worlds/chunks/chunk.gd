@@ -5,6 +5,22 @@ const CHUNK_TILES: int = 33
 const TILE_SIZE: int = 16
 const CHUNK_SIZE: int = CHUNK_TILES * TILE_SIZE
 
+## Tipos de conectores usados para definir como esta Chunk se conecta às vizinhas.
+enum ConnectorType {
+	NONE,       # Sem exigência / sem conexão.
+	ROAD,       # Estrada principal.
+	DIRT_ROAD,  # Estrada de terra.
+	FOREST      # Floresta / vegetação densa.
+}
+
+## Biomas possíveis para uma Chunk.
+enum Biome {
+	CITY,
+	SUBURB,
+	FOREST
+}
+
+## Liga/desliga a visualização de diagnóstico (grade, borda, conectores).
 enum Enabled {
 	ON,
 	OFF
@@ -31,6 +47,45 @@ enum Enabled {
 	set(value):
 		show_connectors = value
 		queue_redraw()
+
+@export_category("Identidade")
+
+## Identificador único da Chunk (ex.: "crossroad_01").
+## Usado pelo WorldGenerator e, futuramente, por chunks especiais.
+@export var chunk_id: String = ""
+
+@export_category("Bioma")
+
+## Bioma a que esta Chunk pertence. Nesta etapa não afeta a geração.
+@export var biome: Biome = Biome.CITY
+
+@export_category("Conectores")
+
+## Conector na borda NORTE (superior).
+@export var north_connector: ConnectorType = ConnectorType.NONE
+
+## Conector na borda SUL (inferior).
+@export var south_connector: ConnectorType = ConnectorType.NONE
+
+## Conector na borda LESTE (direita).
+@export var east_connector: ConnectorType = ConnectorType.NONE
+
+## Conector na borda OESTE (esquerda).
+@export var west_connector: ConnectorType = ConnectorType.NONE
+
+@export_category("Conectores Especiais")
+
+## Conectores diagonais (planejados para o futuro). Não participam da geração nesta etapa.
+
+@export var northeast_connector: ConnectorType = ConnectorType.NONE
+@export var northwest_connector: ConnectorType = ConnectorType.NONE
+@export var southeast_connector: ConnectorType = ConnectorType.NONE
+@export var southwest_connector: ConnectorType = ConnectorType.NONE
+
+@export_category("Geração")
+
+# Dados de geração pertencem ao WorldGenerator, não à Chunk.
+# O comentário acima reserva a categoria no Inspector.
 
 
 func _ready() -> void:

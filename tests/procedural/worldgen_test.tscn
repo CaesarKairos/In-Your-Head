@@ -1,0 +1,4 @@
+[gd_scene format=3 uid="uid://c4wgtest01pro"]
+[ext_resource type="Script" path="res://tests/procedural/worldgen_test.gd" id="1_wg"]
+[node name="WorldGenTest" type="Node2D"]
+script = ExtResource("1_wg")

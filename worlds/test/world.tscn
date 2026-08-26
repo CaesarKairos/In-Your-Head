@@ -1,33 +1,42 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://cgw27roba43x4"]
 
-[ext_resource type="PackedScene" path="res://scenes/characters/player/player.tscn" id="1_player"]
+[ext_resource type="PackedScene" uid="uid://b2iomeyrb8l71" path="res://scenes/characters/player/player.tscn" id="1_player"]
 [ext_resource type="PackedScene" path="res://scenes/weapons/weapon_pickup.tscn" id="2_pickup"]
-[ext_resource type="PackedScene" path="res://scenes/weapons/gun/gun.tscn" id="3_gun"]
-[ext_resource type="PackedScene" path="res://scenes/weapons/pistol/pistol.tscn" id="4_pistol"]
-[ext_resource type="PackedScene" path="res://scenes/weapons/shotgun/shotgun.tscn" id="5_shotgun"]
+[ext_resource type="PackedScene" uid="uid://dise1myiyof8y" path="res://scenes/weapons/gun/gun.tscn" id="3_gun"]
+[ext_resource type="PackedScene" uid="uid://c668knnq7rabf" path="res://scenes/weapons/pistol/pistol.tscn" id="4_pistol"]
+[ext_resource type="PackedScene" uid="uid://bf6ffblpnxa31" path="res://scenes/weapons/shotgun/shotgun.tscn" id="5_shotgun"]
+[ext_resource type="PackedScene" uid="uid://biwck3lq60dcw" path="res://worlds/world_generator.tscn" id="6_wg"]
+[ext_resource type="Texture2D" uid="uid://dvyy63sy71dqo" path="res://assets/props/Objects/Container/Container_3_Gray_Horizontal.png" id="7_cimtp"]
 
 [sub_resource type="RectangleShape2D" id="Rect_wall"]
-size = Vector2(60, 24)
+size = Vector2(40, 23)
 
-[node name="World" type="Node2D"]
+[node name="World" type="Node2D" unique_id=677433516]
 
-[node name="Player" parent="." instance=ExtResource("1_player")]
-position = Vector2(100, 100)
+[node name="WorldGenerator" parent="." unique_id=517536973 instance=ExtResource("6_wg")]
+player_follow_path = "../Player"
 
-[node name="GunPickup" parent="." instance=ExtResource("2_pickup")]
+[node name="Player" parent="." unique_id=1071553871 instance=ExtResource("1_player")]
+position = Vector2(264, 264)
+
+[node name="GunPickup" parent="." unique_id=18325965 instance=ExtResource("2_pickup")]
 position = Vector2(140, 100)
 weapon_scene = ExtResource("3_gun")
 
-[node name="PistolPickup" parent="." instance=ExtResource("2_pickup")]
+[node name="PistolPickup" parent="." unique_id=3059308 instance=ExtResource("2_pickup")]
 position = Vector2(140, 140)
 weapon_scene = ExtResource("4_pistol")
 
-[node name="ShotgunPickup" parent="." instance=ExtResource("2_pickup")]
+[node name="ShotgunPickup" parent="." unique_id=250840868 instance=ExtResource("2_pickup")]
 position = Vector2(180, 140)
 weapon_scene = ExtResource("5_shotgun")
 
-[node name="Wall" type="StaticBody2D" parent="."]
+[node name="Wall" type="StaticBody2D" parent="." unique_id=1969833260]
 position = Vector2(220, 100)
 
-[node name="WallShape" type="CollisionShape2D" parent="Wall"]
+[node name="WallShape" type="CollisionShape2D" parent="Wall" unique_id=16465463]
+position = Vector2(0, -0.5)
 shape = SubResource("Rect_wall")
+
+[node name="Sprite2D" type="Sprite2D" parent="Wall" unique_id=1136416177]
+texture = ExtResource("7_cimtp")

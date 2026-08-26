@@ -54,6 +54,17 @@ var current_direction := "right"
 # Marca de tempo do último disparo (ms) para o cooldown.
 var _last_shot_at: int = -1000000
 
+## Camada explícita de renderização para os projéteis e clarões.
+##
+## A bala e o clarão são instanciados diretamente na cena atual (não dentro do WeaponHolder),
+## por isso NÃO dependem do z_index do WeaponHolder (que varia com a direção de mira).
+## Ao mirar para cima, o WeaponHolder fica em `z_index = -1` (atrás do corpo) e,
+## se o projétil usasse essa mesma camada, ficaria atrás do Ground (que vive em
+## z_index 0). Este valor é sempre superior a 0 (Ground) e ao intervalo da
+## arma/corpo (-1..1), garantindo que o projétil nunca seja desenhado atrás do
+## solo, independente da direção.
+const Z_INDEX_PROJECTILE: int = 100
+
 
 func _ready() -> void:
 	animated_sprite.animation_finished.connect(_on_animation_finished)
@@ -168,8 +179,12 @@ func spawn_projectile(direction: String) -> void:
 	if not bullet:
 		return
 
-	# Desenha-se na mesma camada que a arma (atrás do corpo ao mirar para cima).
-	bullet.z_index = _get_weapon_z_index()
+	# Camada fixa, sempre acima do Ground (z=0) e da arma/corpo (-1..1).
+	# Não depende da camada do WeaponHolder, que varia com a direção de mira.
+	# z_as_relative = false torna o z_index ABSOLUTO: imune a qualquer z_index
+	# de ancestral (garante que a bala nunca fique atrás das chunks/ground).
+	bullet.z_as_relative = false
+	bullet.z_index = Z_INDEX_PROJECTILE
 
 	var scene := get_tree().current_scene
 	if not scene:
@@ -191,15 +206,6 @@ func _get_owner_body() -> CharacterBody2D:
 		node = node.get_parent()
 	return null
 
-## Índice de ordem de desenho (z_index) da arma portadora atual.
-## O muzzle flash e a bala devem ser desenhados na mesma camada que a arma:
-## ao mirar para cima a arma fica atrás do corpo, logo o flash também.
-func _get_weapon_z_index() -> int:
-	var holder := get_parent()
-	if holder:
-		return holder.z_index
-	return 1
-
 func spawn_muzzle_flash(direction: String) -> void:
 	if not muzzle_flash_scene or not muzzle_point:
 		return
@@ -208,8 +214,11 @@ func spawn_muzzle_flash(direction: String) -> void:
 	if not flash:
 		return
 
-	# O flash deve ser desenhado na mesma camada da arma (atrás ao mirar para cima).
-	flash.z_index = _get_weapon_z_index()
+	# Camada fixa (a mesma da bala), sempre acima do Ground (z=0) e da arma/corpo,
+	# independente da direção de mira — não depende do z_index do WeaponHolder.
+	# z_as_relative = false torna o z_index absoluto (imune a ancestrais).
+	flash.z_as_relative = false
+	flash.z_index = Z_INDEX_PROJECTILE
 
 	var scene := get_tree().current_scene
 	if not scene:

@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://biwck3lq60dcw"]
+
+[ext_resource type="Script" uid="uid://dlotn4qtt20x" path="res://worlds/world_generator.gd" id="1_wg"]
+[ext_resource type="PackedScene" uid="uid://c6iynd2mqst7x" path="res://worlds/chunks/chunk.tscn" id="2_chunk"]
+[ext_resource type="PackedScene" uid="uid://c1m57rms4dun1" path="res://worlds/chunks/crossroads_01.tscn" id="3_crossroads"]
+
+[node name="WorldGenerator" type="Node2D" unique_id=31793560]
+script = ExtResource("1_wg")
+chunk_pool = Array[PackedScene]([ExtResource("3_crossroads")])
+excluded_chunks = Array[PackedScene]([ExtResource("2_chunk")])
+
+[node name="Chunks" type="Node2D" parent="." unique_id=1102496075]

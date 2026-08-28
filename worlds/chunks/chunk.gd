@@ -48,6 +48,14 @@ enum Enabled {
 		show_connectors = value
 		queue_redraw()
 
+## Desenha as guias de diagnóstico (grade, borda, conectores) também quando o
+## jogo roda (por exemplo no depurador). Por padrão é falso: fora do editor o
+## mundo fica limpo, sem as guias coloridas de debug.
+@export var show_in_game: bool = false:
+	set(value):
+		show_in_game = value
+		queue_redraw()
+
 @export_category("Identidade")
 
 ## Identificador único da Chunk (ex.: "crossroad_01").
@@ -99,6 +107,11 @@ func _process(_delta: float) -> void:
 
 func _draw() -> void:
 	if enabled == Enabled.OFF:
+		return
+
+	# Fora do editor (jogo/depurador rodando), as guias de diagnóstico só são
+	# desenhadas se o usuário as ligar explicitamente via show_in_game.
+	if not Engine.is_editor_hint() and not show_in_game:
 		return
 
 	if show_grid:

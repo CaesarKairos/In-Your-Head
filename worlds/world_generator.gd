@@ -60,6 +60,23 @@ const ALL_DIRECTIONS: Array[int] = [Direction.NORTH, Direction.EAST, Direction.S
 ## Semente determinística do mundo. Mesmo valor -> mesmas Chunks nas mesmas células.
 @export var world_seed: int = 1337
 
+## Pesos de sorteio por chunk (chave = nome do arquivo .tscn, valor = peso int).
+## Chunks sem entrada usam as regras padrão de DEFAULT_WEIGHT_RULES; peso 1 se
+## nenhuma regra casar. Valores maiores = chunk é sorteada mais vezes.
+@export var chunk_weights: Dictionary = {}
+
+## Regras padrão de peso por prefixo de nome de chunk (aplicadas na ordem).
+## terrain_* é mais comum (terreno de fundo); estradas têm peso menor pra não
+## inundar o mundo; cruzamentos são os mais raros.
+const DEFAULT_WEIGHT_RULES: Array = [
+	["terrain_", 4],
+	["road_curve_", 2],
+	["road_straight_", 2],
+	["road_deadend_", 1],
+	["road_t_", 1],
+	["crossroads_", 1],
+]
+
 ## Se for verdadeiro, gera o mundo em _ready.
 @export var regenerate_on_ready: bool = true
 
@@ -142,6 +159,13 @@ func _stream_cells_around(player_cell: Vector2i) -> void:
 		_unload_chunk(pos)
 
 	# 2) Carrega todas as células dentro do raio de carga.
+	# A célula inicial (0,0) vem PRIMEIRO: ela é imposta (start_chunk_scene) e
+	# os vizinhos precisam ser validados contra os conectores dela — se fosse
+	# carregada depois, vizinhos incompatíveis já estariam no mundo (emendas
+	# quebradas na crossroads inicial).
+	if not _loaded_chunks.has(Vector2i.ZERO) \
+			and _chebyshev(Vector2i.ZERO, player_cell) <= load_radius_chunks:
+		_load_chunk_at(Vector2i.ZERO)
 	for dy in range(-load_radius_chunks, load_radius_chunks + 1):
 		for dx in range(-load_radius_chunks, load_radius_chunks + 1):
 			var cell: Vector2i = player_cell + Vector2i(dx, dy)
@@ -192,17 +216,72 @@ func _choose_chunk_for_position(grid_pos: Vector2i) -> PackedScene:
 		return null
 
 	# Determinismo: mesma semente + mesma célula -> mesma candidata.
-	var idx := _hash_cell(grid_pos) % valid.size()
-	return valid[idx]
+	# Sorteio PONDERADO (roleta) com pesos por chunk (_weight_for_scene).
+	var total := 0
+	var weights: Array[int] = []
+	for scene in valid:
+		var w := _weight_for_scene(scene)
+		weights.append(w)
+		total += w
+	if total <= 0:
+		return valid[_hash_cell(grid_pos) % valid.size()]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _hash_cell(grid_pos)
+	var roll := rng.randi_range(1, total)
+	for i in range(valid.size()):
+		roll -= weights[i]
+		if roll <= 0:
+			return valid[i]
+	return valid[valid.size() - 1]
+
+
+## Peso de sorteio de uma chunk: override explícito em chunk_weights
+## (chave = nome do arquivo), senão regra por prefixo, senão 1.
+func _weight_for_scene(scene: PackedScene) -> int:
+	var file := scene.resource_path.get_file()
+	if chunk_weights.has(file):
+		return maxi(int(chunk_weights[file]), 1)
+	for rule in DEFAULT_WEIGHT_RULES:
+		if file.begins_with(rule[0]):
+			return maxi(int(rule[1]), 1)
+	return 1
 
 
 ## Retorna apenas as cenas compatíveis com TODAS as vizinhas existentes.
+## Regra anti-repetição: candidatos "terreno puro" (4 conectores NONE) que
+## repetiriam o mesmo chunk_id de um vizinho imediato já carregado são
+## descartados — exceto se isso esvaziar a lista (aí mantemos todos).
 func _get_valid_chunks_for_position(grid_pos: Vector2i) -> Array[PackedScene]:
 	var valid: Array[PackedScene] = []
 	for scene in _get_generatable_chunks():
 		if _is_scene_compatible_with_neighbors(scene, grid_pos):
 			valid.append(scene)
-	return valid
+
+	var non_repeating: Array[PackedScene] = []
+	for scene in valid:
+		if not _would_repeat_neighbor_terrain(scene, grid_pos):
+			non_repeating.append(scene)
+	return non_repeating if not non_repeating.is_empty() else valid
+
+
+## Verdadeiro se `scene` é terreno puro (N/S/E/W = NONE) e tem o mesmo
+## chunk_id de alguma vizinha já carregada.
+func _would_repeat_neighbor_terrain(scene: PackedScene, grid_pos: Vector2i) -> bool:
+	var meta := _get_chunk_meta(scene)
+	if int(meta["north"]) != ChunkScript.ConnectorType.NONE \
+			or int(meta["south"]) != ChunkScript.ConnectorType.NONE \
+			or int(meta["east"]) != ChunkScript.ConnectorType.NONE \
+			or int(meta["west"]) != ChunkScript.ConnectorType.NONE:
+		return false
+	var my_id := scene.resource_path.get_file().get_basename()
+	for direction in ALL_DIRECTIONS:
+		var neighbor_pos: Vector2i = grid_pos + _grid_offset(direction)
+		if not _loaded_chunks.has(neighbor_pos):
+			continue
+		var neighbor: Node2D = _loaded_chunks[neighbor_pos]
+		if str(neighbor.get("chunk_id")) == my_id:
+			return true
+	return false
 
 
 ## Verifica a compatibilidade com TODAS as vizinhas já carregadas (norte, sul, leste, oeste).

@@ -20,6 +20,7 @@ extends RefCounted
 ## Player, que aparece depois do WorldGenerator na árvore de world.tscn.
 
 const TILE_SIZE: int = 16
+const PropScript: GDScript = preload("res://worlds/chunks/nature_prop.gd")
 
 ## Fração das células elegíveis que recebe um prop (8–15%).
 const DENSITY: float = 0.12
@@ -133,10 +134,11 @@ static func scatter(chunk: Node2D, grid_pos: Vector2i, world_seed: int) -> void:
 
 	for k in range(mini(count, eligible.size())):
 		var cell := eligible[k]
-		var texture := _pick_texture(rng)
+		var pick := _pick(rng)
+		var texture: Texture2D = pick["texture"]
 		if texture == null:
 			continue
-		nature.add_child(_make_sprite(texture, cell, rng))
+		nature.add_child(_make_prop(texture, String(pick["kind"]), cell, rng))
 
 
 
@@ -155,7 +157,7 @@ static func _find_ground_layer(chunk: Node2D) -> TileMapLayer:
 	return null
 
 
-static func _pick_texture(rng: RandomNumberGenerator) -> Texture2D:
+static func _pick(rng: RandomNumberGenerator) -> Dictionary:
 	var total_weight := 0
 	for category in PROP_CATEGORIES:
 		total_weight += int(category["weight"])
@@ -168,7 +170,7 @@ static func _pick_texture(rng: RandomNumberGenerator) -> Texture2D:
 			break
 	var paths: Array = chosen["paths"]
 	var path: String = paths[rng.randi_range(0, paths.size() - 1)]
-	return _load_texture(path)
+	return {"kind": String(chosen["name"]), "texture": _load_texture(path)}
 
 
 static func _load_texture(path: String) -> Texture2D:
@@ -183,16 +185,27 @@ static func _load_texture(path: String) -> Texture2D:
 	return tex
 
 
-static func _make_sprite(texture: Texture2D, cell: Vector2i, rng: RandomNumberGenerator) -> Sprite2D:
-	var sprite := Sprite2D.new()
-	sprite.texture = texture
-	sprite.centered = false
+## Cria o nó do prop: NatureProp (colisão + oclusão) para árvores, arbustos,
+## tocos e pedras; Sprite2D simples para decoração baixa (grama, flores etc.).
+static func _make_prop(texture: Texture2D, kind: String, cell: Vector2i, rng: RandomNumberGenerator) -> Node2D:
+	var solid_kinds := ["tree", "bush", "rock"]
+	var occludable_kinds := ["tree", "bush"]
+	var node: Node2D
+	if kind in solid_kinds:
+		var prop: Node2D = PropScript.new()
+		prop.set("texture", texture)
+		prop.set("solid", true)
+		prop.set("occludable", kind in occludable_kinds)
+		node = prop
+	else:
+		var sprite := Sprite2D.new()
+		sprite.texture = texture
+		sprite.centered = false
+		sprite.offset = Vector2(-texture.get_size().x / 2.0, -texture.get_size().y)
+		node = sprite
 	# Ancora a BASE do prop no centro da célula (com leve jitter), de modo que
 	# árvores/arbustos "plantem" no chão e não flutuem sobre a célula.
-	var size := texture.get_size()
-	sprite.offset = Vector2(-size.x / 2.0, -size.y)
 	var jitter := float(TILE_SIZE) * 0.3
-	sprite.position = Vector2(cell) * float(TILE_SIZE) + Vector2(TILE_SIZE, TILE_SIZE) * 0.5
-	sprite.position += Vector2(rng.randf_range(-jitter, jitter), rng.randf_range(-jitter, jitter))
-	sprite.flip_h = rng.randf() < 0.5
-	return sprite
+	node.position = Vector2(cell) * float(TILE_SIZE) + Vector2(TILE_SIZE, TILE_SIZE) * 0.5
+	node.position += Vector2(rng.randf_range(-jitter, jitter), rng.randf_range(-jitter, jitter))
+	return node

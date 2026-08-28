@@ -48,6 +48,8 @@ func _process(_delta: float) -> bool:
 	# e todos os props devem estar sobre células de grama lisa (5,0).
 	var nature_total := 0
 	var chunks_with_nature := 0
+	var solid_props := 0
+	var occlusion_areas := 0
 	for pos in loaded:
 		var chunk_node: Node = loaded[pos]
 		var nature_node: Node = chunk_node.get_node_or_null("Nature")
@@ -59,13 +61,18 @@ func _process(_delta: float) -> bool:
 		var bad := 0
 		for prop in nature_node.get_children():
 			nature_total += 1
+			if (prop as Node).get_node_or_null("Body") is StaticBody2D:
+				solid_props += 1
+			if (prop as Node).get_node_or_null("OcclusionArea") is Area2D:
+				occlusion_areas += 1
 			var cell := Vector2i((prop as Node2D).position / 16.0)
 			if ground.get_cell_atlas_coords(cell) != bg:
 				bad += 1
 		if bad > 0:
 			print("PROPS FORA DA GRAMA em ", pos, ": ", bad)
 		chunks_with_nature += 1
-	print("Natureza: ", nature_total, " props em ", chunks_with_nature, " chunks")
+	print("Natureza: ", nature_total, " props em ", chunks_with_nature,
+		" chunks (sólidos: ", solid_props, ", áreas de oclusão: ", occlusion_areas, ")")
 
 	# Determinismo: segunda geração com a mesma seed deve produzir o mesmo mapa.
 	var first_layout := {}
@@ -83,6 +90,7 @@ func _process(_delta: float) -> bool:
 		print("TESTE OK")
 	else:
 		print("TESTE FALHOU (erros de emenda: %d, natureza: %d/%d)" % [errors, chunks_with_nature, loaded.size()])
-	var success := errors == 0 and deterministic and nature_total > 0 and chunks_with_nature == loaded.size()
+	var success := errors == 0 and deterministic and nature_total > 0 \
+			and chunks_with_nature == loaded.size() and solid_props > 0 and occlusion_areas > 0
 	quit(0 if success else 1)
 	return true

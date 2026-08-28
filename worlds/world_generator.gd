@@ -10,6 +10,7 @@ extends Node2D
 ## sempre produz a mesma Chunk (determinismo por world_seed + posição).
 
 const ChunkScript: GDScript = preload("res://worlds/chunks/chunk.gd")
+const NatureScatter: GDScript = preload("res://worlds/chunks/nature_scatter.gd")
 
 ## Dimensões de uma Chunk — compartilhadas com chunk.gd.
 const CHUNK_TILES: int = 33
@@ -163,6 +164,7 @@ func _load_chunk_at(grid_pos: Vector2i) -> void:
 
 	chunks.add_child(inst)
 	_loaded_chunks[grid_pos] = inst
+	NatureScatter.scatter(inst, grid_pos, world_seed)
 	print(
 		"[WorldGenerator] Chunk grid %s -> %s"
 		% [grid_pos, scene.resource_path.get_file().get_basename()]
@@ -236,11 +238,11 @@ func _is_scene_compatible_with_neighbors(scene: PackedScene, grid_pos: Vector2i)
 	return true
 
 
-## NONE = ausência de requisito (comportamento existente). Um conector não-NONE por
-## parte da vizinha exige que a candidata ofereça o mesmo valor nesse lado.
+## Compatibilidade ESTRITAMENTE simétrica: os dois lados que se tocam precisam
+## declarar exatamente o mesmo tipo de conector (ROAD↔ROAD, NONE↔NONE etc.).
+## Aceitar qualquer valor quando a vizinha é NONE permitia estradas "nascerem"
+## coladas em grama pura (chunks desconectadas).
 func _connector_compatible(candidate_side: int, neighbor_side: int) -> bool:
-	if neighbor_side == ChunkScript.ConnectorType.NONE:
-		return true
 	return candidate_side == neighbor_side
 
 

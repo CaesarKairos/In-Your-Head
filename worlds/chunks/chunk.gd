@@ -92,6 +92,11 @@ enum Enabled {
 
 @export_category("Geração")
 
+## Atlas coord do tile de fundo liso (grama sem estrada) usado por esta Chunk.
+## Fonte única de verdade para o scatter de natureza: só nasce vegetação sobre
+## células cujo atlas coord no "Ground" seja este.
+@export var background_atlas_coords: Vector2i = Vector2i(5, 0)
+
 # Dados de geração pertencem ao WorldGenerator, não à Chunk.
 # O comentário acima reserva a categoria no Inspector.
 

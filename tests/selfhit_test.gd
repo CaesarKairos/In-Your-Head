@@ -26,6 +26,10 @@ const DIRECTIONS: Array[String] = ["up", "down", "left", "right"]
 func _ready() -> void:
 	_player = CharacterBody2D.new()
 	_player.name = "PlayerTest"
+	# Mesmas camadas do Player real (layer 2 = player, mask 1 = world),
+	# para que a bala (layer 3, mask 1) nunca colida com ele.
+	_player.collision_layer = 2
+	_player.collision_mask = 1
 	_player.position = Vector2(300, 200)
 	add_child(_player)
 	var cs := CapsuleShape2D.new()

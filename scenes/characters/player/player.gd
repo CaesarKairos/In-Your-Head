@@ -22,8 +22,15 @@ func _physics_process(_delta: float) -> void:
 	if Input.is_action_just_pressed("reload") and equipped_weapon:
 		equipped_weapon.reload()
 
-	# Ataque
-	if Input.is_action_just_pressed("attack") and not is_attacking:
+	# Ataque: armas automáticas usam "is_action_pressed" (segurar dispara em
+	# rajada, respeitando o cooldown); semiautomáticas exigem um clique por tiro.
+	var wants_to_attack := (
+		Input.is_action_pressed("attack")
+		if equipped_weapon and equipped_weapon.is_automatic
+		else Input.is_action_just_pressed("attack")
+	)
+
+	if wants_to_attack:
 		start_attack()
 		return
 

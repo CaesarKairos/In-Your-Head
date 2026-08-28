@@ -14,6 +14,12 @@ func _ready() -> void:
     attack_cooldown = 1.0
     reload_time = 1.6
 
+    # Shotgun é semiautomática, com disparo em leque (vários pellets, 1 munição
+    # por tiro) e o maior espalhamento das três armas.
+    is_automatic = false
+    spread_degrees = 18.0
+    pellet_count = 6
+
     bullet_scene = load("res://scenes/weapons/projectiles/bullet.tscn") as PackedScene
     muzzle_flash_scene = load("res://scenes/weapons/effects/muzzle_flash.tscn") as PackedScene
 

@@ -11,6 +11,11 @@ func _ready() -> void:
     attack_cooldown = 0.15
     reload_time = 1.4
 
+    # Pistol é semiautomática (um clique por tiro) e a mais precisa (menor spread).
+    is_automatic = false
+    spread_degrees = 2.0
+    pellet_count = 1
+
     bullet_scene = load("res://scenes/weapons/projectiles/bullet.tscn") as PackedScene
     muzzle_flash_scene = load("res://scenes/weapons/effects/muzzle_flash.tscn") as PackedScene
 

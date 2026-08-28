@@ -13,6 +13,12 @@ func _ready() -> void:
     attack_cooldown = fire_rate
     reload_time = 1.25
 
+    # Comportamento de disparo: Gun é automática (segurar dispara em rajada,
+    # respeitando a cadência), com espalhamento moderado (sentido no automático).
+    is_automatic = true
+    spread_degrees = 5.0
+    pellet_count = 1
+
     # Cenas reutilizáveis de projétil e clarão de boca.
     bullet_scene = load("res://scenes/weapons/projectiles/bullet.tscn") as PackedScene
     muzzle_flash_scene = load("res://scenes/weapons/effects/muzzle_flash.tscn") as PackedScene

@@ -8,6 +8,16 @@ signal reload_finished
 @export var damage: int = 1
 @export var attack_cooldown: float = 0.5
 
+## True: segurar o botão de ataque continua disparando (respeitando o cooldown).
+## False: exige um clique por tiro (semiautomático).
+@export var is_automatic: bool = false
+## Ângulo total (em graus) de espalhamento dos projéteis. 0 = tiros perfeitamente
+## retos. O desvio angular de cada projétil fica dentro de [-spread/2, +spread/2].
+@export var spread_degrees: float = 0.0
+## Quantidade de projéteis disparados por tiro (1 = comportamento padrão).
+## A munição consumida é 1 por disparo, não uma por projétil.
+@export var pellet_count: int = 1
+
 ## Capacidade do carregador (definida pela arma concreta).
 @export var magazine_size: int = 6
 ## Munição atual dentro do carregador.
@@ -127,8 +137,10 @@ func attack(direction: String = "right") -> bool:
 	# Não disparar enquanto recarga.
 	if is_reloading:
 		return false
-	# Não iniciar dois disparos ao mesmo tempo.
-	if is_attacking:
+	# A arma automática pode encadear tiros enquanto o botão estiver pressionado
+	# (a cadência é controlada pelo cooldown); a semiautomática bloqueia novo
+	# disparo enquanto a animação do tiro estiver em andamento.
+	if is_attacking and not is_automatic:
 		return false
 	# Respetar o cooldown de disparo.
 	if Time.get_ticks_msec() - _last_shot_at < int(attack_cooldown * 1000.0):
@@ -170,30 +182,45 @@ func finish_attack() -> void:
 	attack_finished.emit()
 
 
-## Cria a bala na posição global do MuzzlePoint, independente do Player.
+## Cria os projéteis na posição global do MuzzlePoint, independente do Player.
+## Dispara `pellet_count` balas (comportamento padrão = 1), cada uma com seu
+## próprio desvio angular dentro de [-spread_degrees/2, +spread_degrees/2].
 func spawn_projectile(direction: String) -> void:
 	if not bullet_scene or not muzzle_point:
 		return
-
-	var bullet := bullet_scene.instantiate()
-	if not bullet:
-		return
-
-	# Camada fixa, sempre acima do Ground (z=0) e da arma/corpo (-1..1).
-	# Não depende da camada do WeaponHolder, que varia com a direção de mira.
-	# z_as_relative = false torna o z_index ABSOLUTO: imune a qualquer z_index
-	# de ancestral (garante que a bala nunca fique atrás das chunks/ground).
-	bullet.z_as_relative = false
-	bullet.z_index = Z_INDEX_PROJECTILE
 
 	var scene := get_tree().current_scene
 	if not scene:
 		return
 
-	# add_child.call_deferred evita erros se spawn_projectile for chamado em _ready.
-	scene.call_deferred("add_child", bullet)
-	bullet.position = muzzle_point.global_position
-	bullet.call_deferred("setup", muzzle_point.global_position, direction_vector(direction), damage, projectile_texture, projectile_max_distance, _get_owner_body())
+	# Direção base do disparo (cardinal) antes do espalhamento.
+	var base_direction := direction_vector(direction)
+	# Cada bala nasce num mesmo ponto; a munição é consumida 1x por disparo em
+	# attack(), não uma por pellet.
+	var shot_count := maxi(pellet_count, 1)
+
+	for i in shot_count:
+		var bullet := bullet_scene.instantiate()
+		if not bullet:
+			continue
+
+		# Camada fixa, sempre acima do Ground (z=0) e da arma/corpo (-1..1).
+		# Não depende da camada do WeaponHolder, que varia com a direção de mira.
+		# z_as_relative = false torna o z_index ABSOLUTO: imune a qualquer z_index
+		# de ancestral (garante que a bala nunca fique atrás das chunks/ground).
+		bullet.z_as_relative = false
+		bullet.z_index = Z_INDEX_PROJECTILE
+
+		# Aplica o desvio angular aleatório (em radianos) dentro do spread.
+		var shot_direction := base_direction
+		if spread_degrees > 0.0:
+			var spread_rad := deg_to_rad(spread_degrees) * randf_range(-0.5, 0.5)
+			shot_direction = shot_direction.rotated(spread_rad)
+
+		# add_child.call_deferred evita erros se spawn_projectile for chamado em _ready.
+		scene.call_deferred("add_child", bullet)
+		bullet.position = muzzle_point.global_position
+		bullet.call_deferred("setup", muzzle_point.global_position, shot_direction, damage, projectile_texture, projectile_max_distance, _get_owner_body())
 
 
 ## Sobe pela árvore até encontrar o CharacterBody2D que empunha esta arma.

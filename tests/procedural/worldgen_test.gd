@@ -38,9 +38,11 @@ func _ready() -> void:
 	_wg.set("unload_radius_chunks", 2)
 	_wg.set("world_seed", 42)
 	_wg.call("generate_world")
-	# Streaming activo durante el movimiento del Player.
+	# Streaming ativo durante o movimento do Player.
 	_wg.set("regenerate_on_ready", true)
-	await _wait(2)
+	# O streaming agora é ASSÍNCRONO (1 chunk commit/frame + load em thread):
+	# aguarda frames suficientes para as 9 células iniciais aparecerem.
+	await _wait(150)
 
 	# B) / C) / D) / E) iniciales.
 	_initial_map = _cell_map()
@@ -59,10 +61,10 @@ func _ready() -> void:
 
 	# F) Descartar + recargar con mismo seed -> misma chunk.
 	await _move_to(Vector2i(7, 7))
-	await _wait(3)
+	await _wait(150)
 	# Ahora la región original quedó fuera del radio de descarga.
 	await _move_to(Vector2i.ZERO)
-	await _wait(3)
+	await _wait(150)
 	_check_determinism()
 
 	await _wait(10)
@@ -126,7 +128,8 @@ func _check_initial_cells() -> void:
 
 func _move_to(c: Vector2i) -> void:
 	_fake.global_position = _cell_to_world(c)
-	await _wait(4)  # deja correr algunos _physics_process del generador
+	# Carga assíncrona: dá tempo ao anel de ~9 células novas + gating norte/oeste.
+	await _wait(150)  # deixa correr vários _physics_process/_process do gerador
 
 
 func _expect_has(c: Vector2i, label: String) -> void:

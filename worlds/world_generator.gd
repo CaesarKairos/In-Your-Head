@@ -26,6 +26,12 @@ const BASE_CHUNK_SCENE: String = "res://worlds/chunks/chunk.tscn"
 ## É a ÚNICA forma de converter uma coordenada de grid em posição de mundo.
 const GRID_SPACING: int = CHUNK_SIZE
 
+## Máximo de Chunks reintroduzidas na árvore por frame (distribui a instanciação
+## ao longo de vários frames em vez de estourar o frame da transição).
+const MAX_COMMITS_PER_FRAME: int = 1
+## Limite de instâncias ociosas guardadas no pool por tipo de chunk.
+const POOL_LIMIT_PER_TYPE: int = 6
+
 enum Direction {
 	NORTH,
 	EAST,
@@ -97,40 +103,77 @@ var _chunk_meta_cache: Dictionary = {}      # path -> Dictionary (conectores)
 var _generatable_cache: Array[PackedScene] = []
 var _generatable_cache_dirty: bool = true
 var _player_cached: Node2D = null
+var _autoload_registered: bool = false
+
+# --- Estado do streaming ASSÍNCRONO / pool (otimização de stutter) ---
+var _desired_cells: Dictionary = {}         # cell -> true (dentro do load_radius)
+var _pending: Dictionary = {}               # cell -> {path} (load em andamento)
+var _prefetch_paths: Dictionary = {}        # path -> true (recursos já pré-buscados)
+var _pool: Dictionary = {}                  # path -> Array[Node2D] instâncias ociosas
+var _pool_root: Node2D = null
 
 
 func _ready() -> void:
 	_generatable_cache_dirty = true
+	# Raiz oculta fora da área visível que guarda instâncias ociosas do pool.
+	_pool_root = Node2D.new()
+	_pool_root.name = "_Pool"
+	_pool_root.visible = false
+	add_child(_pool_root)
+	_register_with_autoload(_get_player())
 	if regenerate_on_ready:
 		generate_world()
 
 
 ## Atualiza o streaming apenas quando o Player muda de célula.
+## Detecta mudança de célula do Player (gatilho do streaming). O carregamento
+## pesado (instanciação) NÃO acontece aqui: apenas detecta a fronteira e dispara
+## o prefetch preditivo; o _process() faz o work (load + commit) distribuído ao
+## longo dos frames seguintes.
 func _physics_process(_delta: float) -> void:
 	if not regenerate_on_ready:
 		return
 	var player := _get_player()
 	if player == null:
 		return
+	_register_with_autoload(player)
 	var cell := _world_to_grid(player.global_position)
 	if cell == _player_last_cell:
 		return
+	var prev := _player_last_cell
 	_player_last_cell = cell
-	_stream_cells_around(cell)
+	_prefetch_ahead(prev, cell, player)
 
 
-## Limpa todas as Chunks e o estado interno.
+## Loop por frame: poll dos loads assíncronos + commit de poucas chunks por frame.
+func _process(_delta: float) -> void:
+	if not regenerate_on_ready:
+		return
+	_tick_stream(_player_last_cell)
+
+
+## Limpa todas as Chunks, o pool e os estados internos.
 func clear_world() -> void:
 	if is_node_ready() and chunks:
 		for child in chunks.get_children():
 			chunks.remove_child(child)
 			child.free()
+	if _pool_root != null and is_instance_valid(_pool_root):
+		for path in _pool.keys():
+			for inst in _pool[path]:
+				if is_instance_valid(inst):
+					inst.free()
+	_pool.clear()
+	_pending.clear()
+	_desired_cells.clear()
 	_loaded_chunks.clear()
 	_player_last_cell = Vector2i(0, -1000000)
 	_generatable_cache_dirty = true
 
 
 ## Gera (ou regenera) o mundo ao redor do Player ou do centro.
+## O streaming em si é assíncrono: aqui só preparamos o terreno, pré-buscamos os
+## recursos e marcamos para o _process() resolver.
 func generate_world() -> void:
 	clear_world()
 	if start_chunk_scene == null:
@@ -142,15 +185,39 @@ func generate_world() -> void:
 		push_warning(
 			"[WorldGenerator] No hay cenas generables (revisa res://worlds/chunks/, chunk_pool y excluded_chunks)."
 		)
+	# Pré-busca (prefetch) dos recursos em background: deixa o disco aquecido para
+	# que, ao cruzar uma fronteira, load_threaded_get() retorne instantaneamente.
+	for scene in available:
+		_prefetch(scene.resource_path)
 
 	var player := _get_player()
 	var center := (_world_to_grid(player.global_position) if player else Vector2i.ZERO)
 	_player_last_cell = center
-	_stream_cells_around(center)
-## --- Streaming: carga/descarga ao redor de uma célula ---
+	_register_with_autoload(player)
+	_prefetch_ahead(center, center, player)
 
-func _stream_cells_around(player_cell: Vector2i) -> void:
-	# 1) Descarrega as células fora do raio de descarga.
+
+## --- Streaming ASSÍNCRONO: previsão, pool, 1 commit/frame ---
+
+## Orquestra o ciclo em cada frame. Usa a célula atual do jogador (que pode ser
+## a sentinela inicial até o primeiro cruzamento).
+func _tick_stream(player_cell: Vector2i) -> void:
+	_update_desired(player_cell)
+	_unload_out_of_range(player_cell)
+	_request_pending_loads(player_cell)
+	_commit_ready(player_cell)
+
+
+## Conjunto desejado: todas as células dentro do load_radius ao redor do jogador.
+func _update_desired(player_cell: Vector2i) -> void:
+	_desired_cells.clear()
+	for dy in range(-load_radius_chunks, load_radius_chunks + 1):
+		for dx in range(-load_radius_chunks, load_radius_chunks + 1):
+			_desired_cells[player_cell + Vector2i(dx, dy)] = true
+
+
+## Move para o pool (em vez de free) as células que saíram do unload_radius.
+func _unload_out_of_range(player_cell: Vector2i) -> void:
 	var to_unload: Array[Vector2i] = []
 	for key in _loaded_chunks:
 		if _chebyshev(key, player_cell) > unload_radius_chunks:
@@ -158,49 +225,242 @@ func _stream_cells_around(player_cell: Vector2i) -> void:
 	for pos in to_unload:
 		_unload_chunk(pos)
 
-	# 2) Carrega todas as células dentro do raio de carga.
-	# A célula inicial (0,0) vem PRIMEIRO: ela é imposta (start_chunk_scene) e
-	# os vizinhos precisam ser validados contra os conectores dela — se fosse
-	# carregada depois, vizinhos incompatíveis já estariam no mundo (emendas
-	# quebradas na crossroads inicial).
-	if not _loaded_chunks.has(Vector2i.ZERO) \
-			and _chebyshev(Vector2i.ZERO, player_cell) <= load_radius_chunks:
-		_load_chunk_at(Vector2i.ZERO)
+
+## Dispara cargas assíncronas (ResourceLoader.load_threaded_request) para as
+## células prontas. "Pronta" = norte e oeste já carregados (mesma invariante do
+## antigo scan linha-a-coluna), preservando a validação de conectores.
+func _request_pending_loads(player_cell: Vector2i) -> void:
+	# Célula inicial (0,0): imposta (start_chunk_scene), sem depender de vizinho.
+	if _desired_cells.has(Vector2i.ZERO) \
+			and not _loaded_chunks.has(Vector2i.ZERO) \
+			and not _pending.has(Vector2i.ZERO) \
+			and start_chunk_scene != null:
+		_request_load(Vector2i.ZERO, start_chunk_scene)
+
 	for dy in range(-load_radius_chunks, load_radius_chunks + 1):
 		for dx in range(-load_radius_chunks, load_radius_chunks + 1):
 			var cell: Vector2i = player_cell + Vector2i(dx, dy)
-			if not _loaded_chunks.has(cell):
-				_load_chunk_at(cell)
+			if cell == Vector2i.ZERO:
+				continue
+			if _loaded_chunks.has(cell) or _pending.has(cell):
+				continue
+			if not _is_cell_ready(cell):
+				continue
+			var scene := _choose_chunk_for_position(cell)
+			if scene == null:
+				continue
+			_request_load(cell, scene)
 
 
-func _load_chunk_at(grid_pos: Vector2i) -> void:
-	if _loaded_chunks.has(grid_pos):
+## Uma célula só é elegível para load quando seus vizinhos norte e oeste que
+## estejam DENTRO do load_radius já estão carregados (validação de conectores).
+func _is_cell_ready(cell: Vector2i) -> bool:
+	var north := cell + Vector2i(0, -1)
+	var west := cell + Vector2i(-1, 0)
+	if _desired_cells.has(north) and not _loaded_chunks.has(north):
+		return false
+	if _desired_cells.has(west) and not _loaded_chunks.has(west):
+		return false
+	return true
+
+
+## Inicia o carregamento de uma célula: apenas registra o path na fila de poll;
+## a reutilização de pool e o commit são feitos em _commit_ready (dentro do
+## limite de 1 por frame). O resource já é pré-buscado de antemão por _prefetch
+## (load_threaded_request); o _commit_ready faz o load_threaded_get correspondente.
+func _request_load(cell: Vector2i, scene: PackedScene) -> void:
+	var path := scene.resource_path
+	if not _prefetch_paths.has(path):
+		_prefetch(path)
+	_pending[cell] = {"path": path}
+
+
+## Poll dos carregamentos e commit de POUCAS chunks por frame
+## (MAX_COMMITS_PER_FRAME), distribuindo a instanciação ao longo dos frames.
+## Recursos já em cache (a maioria: descobertos em generate_world) entram sem
+## espera; os que nunca foram cached dependem do load_threaded_request do prefetch.
+func _commit_ready(player_cell: Vector2i) -> void:
+	var ready: Array[Vector2i] = []
+	for cell in _pending.keys():
+		if _is_loaded(_pending[cell]["path"]):
+			ready.append(cell)
+	if ready.is_empty():
 		return
+	# Ordem determinística linha-a-coluna (norte/oeste antes de sul/leste).
+	ready.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		if a.y != b.y:
+			return a.y < b.y
+		return a.x < b.x)
+	var n := mini(MAX_COMMITS_PER_FRAME, ready.size())
+	for i in n:
+		var cell := ready[i]
+		# Se ficou longe demais enquanto carregava, descarta (não entra no mundo).
+		if _chebyshev(cell, player_cell) > unload_radius_chunks:
+			_pending.erase(cell)
+			continue
+		var path: String = _pending[cell]["path"]
+		var scene: PackedScene = _get_scene(path)
+		_pending.erase(cell)
+		if scene == null:
+			continue
+		# Reutilização de pool dentro do limite por frame (zero instanciação).
+		_finalize_chunk(cell, _pop_pool(scene), scene)
 
-	var scene := _choose_chunk_for_position(grid_pos)
-	if scene == null:
-		return
 
-	var world_pos := _grid_to_world(grid_pos)
-	var inst := _spawn_chunk(scene, world_pos)
-	if inst == null:
-		return
+## Verdadeiro quando o resource do chunk já está disponível para instanciar:
+## já cacheado (caminho normal) OU terminou o load em thread do prefetch.
+func _is_loaded(path: String) -> bool:
+	if ResourceLoader.has_cached(path):
+		return true
+	return ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_LOADED
 
-	chunks.add_child(inst)
-	_loaded_chunks[grid_pos] = inst
-	NatureScatter.scatter(inst, grid_pos, world_seed)
+
+## Recupera o PackedScene do chunk: direto do cache (instantâneo, memória) se já
+## carregado; senão, via load_threaded_get (troca a thread pelo recurso pronto).
+func _get_scene(path: String) -> PackedScene:
+	if ResourceLoader.has_cached(path):
+		return load(path) as PackedScene
+	return ResourceLoader.load_threaded_get(path) as PackedScene
+
+
+## Conclui a entrada de uma chunk no mundo: posiciona, adiciona à árvore, marca
+## como carregada e adia o scatter (setup de nós/corpos físicos) para não travar
+## o frame. `reused_inst` é uma instância vinda do pool (zero instanciação).
+func _finalize_chunk(cell: Vector2i, reused_inst: Node2D, scene: PackedScene) -> void:
+	var world_pos := _grid_to_world(cell)
+	var inst := reused_inst
+	if inst != null:
+		inst.position = world_pos
+		inst.visible = true
+		chunks.add_child(inst)
+	else:
+		inst = _spawn_chunk(scene, world_pos)
+		if inst == null:
+			_pending.erase(cell)
+			return
+		chunks.add_child(inst)
+	_loaded_chunks[cell] = inst
+	_pending.erase(cell)
+	inst.set_meta("source_path", scene.resource_path)
+	# Scatter pesado (dezenas de corpos físicos) vai para o fim da frame.
+	call_deferred("_scatter_deferred", inst, cell)
 	print(
 		"[WorldGenerator] Chunk grid %s -> %s"
-		% [grid_pos, scene.resource_path.get_file().get_basename()]
+		% [cell, scene.resource_path.get_file().get_basename()]
 	)
 
 
+## Povoa a natureza de uma chunk de forma diferida (evita o pico de custo no
+## frame da transição). Remove qualquer container "Nature" prévio (reuso do pool).
+func _scatter_deferred(chunk: Node2D, cell: Vector2i) -> void:
+	if not is_instance_valid(chunk):
+		return
+	var existing := chunk.get_node_or_null("Nature")
+	if existing != null:
+		chunk.remove_child(existing)
+		existing.free()
+	NatureScatter.scatter(chunk, cell, world_seed)
+
+
+## Descarga: VAI PARA O POOL (quando o tipo tem vaga) em vez de free(), para
+## reutilizar a instância se o jogador voltar à célula (evita reinstanciar).
 func _unload_chunk(grid_pos: Vector2i) -> void:
 	var inst: Node2D = _loaded_chunks.get(grid_pos, null)
 	if inst != null and is_instance_valid(inst):
 		chunks.remove_child(inst)
-		inst.free()
+		_push_pool(inst)
 	_loaded_chunks.erase(grid_pos)
+
+
+## Guarda a instância no pool (oculta, longe da câmera) ou libera se o tipo
+## já atingiu POOL_LIMIT_PER_TYPE.
+func _push_pool(inst: Node2D) -> void:
+	var path := ""
+	if inst.has_meta("source_path"):
+		path = str(inst.get_meta("source_path"))
+	if path == "":
+		inst.free()
+		return
+	# Remove a vegetação (corpos físicos) antes de ociosar: o pool guarda apenas o
+	# TileMap, evitando dezenas de StaticBody2D ativos fora da câmera. Na reutilização
+	# o _scatter_deferred recria a natureza.
+	var nature := inst.get_node_or_null("Nature")
+	if nature != null:
+		inst.remove_child(nature)
+		nature.free()
+	var arr: Array = _pool.get(path, [])
+	if arr.size() < POOL_LIMIT_PER_TYPE:
+		_pool_root.add_child(inst)
+		inst.position = Vector2(1e7, 1e7)
+		inst.visible = false
+		arr.append(inst)
+		_pool[path] = arr
+	else:
+		inst.free()
+
+
+## Retira uma instância ociosa do pool para o `scene` (mesma resource_path), se
+## houver. Retorna null se o pool está vazio para aquele tipo.
+func _pop_pool(scene: PackedScene) -> Node2D:
+	var path := scene.resource_path
+	var arr: Array = _pool.get(path, [])
+	while arr.size() > 0:
+		var inst: Node2D = arr.pop_back()
+		if is_instance_valid(inst):
+			_pool_root.remove_child(inst)
+			return inst
+	_pool.erase(path)
+	return null
+
+
+## Pré-busca (threaded) do recurso de um .tscn, sem esperar por ele. O guard
+## `_prefetch_paths` evita repetir pedidos para recursos já aquecidos/cacheados.
+func _prefetch(path: String) -> void:
+	if _prefetch_paths.has(path) or ResourceLoader.has_cached(path):
+		_prefetch_paths[path] = true
+		return
+	_prefetch_paths[path] = true
+	ResourceLoader.load_threaded_request(path, "", true, ResourceLoader.CACHE_MODE_REUSE)
+
+
+## Previsão de direção de movimento: pré-busca os recursos das células do anel
+## imediatamente além do load_radius na direção do deslocamento. São apenas
+## *recursos* aquecidos (nunca commit de células fora do raio), então quando o
+## jogador cruzar a fronteira o load_threaded_get() já estará pronto.
+func _prefetch_ahead(prev_cell: Vector2i, cell: Vector2i, player: Node2D) -> void:
+	var dir := cell - prev_cell
+	if dir == Vector2i.ZERO:
+		dir = Vector2i(0, 1)
+	# Normaliza para uma direção cardinal (caso o movimento seja diagonal).
+	if absi(dir.x) >= absi(dir.y):
+		dir = Vector2i(signi(dir.x), 0)
+	else:
+		dir = Vector2i(0, signi(dir.y))
+	var look := load_radius_chunks + 1
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			if absi(dx) == 1 and absi(dy) == 1:
+				continue
+			var ahead: Vector2i = cell + dir * look + Vector2i(dx, dy)
+			var scene := _choose_chunk_for_position(ahead)
+			if scene != null:
+				_prefetch(scene.resource_path)
+
+
+## Registra origem e player no autoload WorldCoordinates (fonte única de verdade).
+func _register_with_autoload(player: Node2D) -> void:
+	if _autoload_registered:
+		return
+	# Variant: acesso dinâmico ao autoload (set_origin/register_player).
+	var wc: Variant = get_node_or_null("/root/WorldCoordinates")
+	if wc == null:
+		_autoload_registered = true  # autoload ausente (ex.: rodando isolado)
+		return
+	if wc.has_method("set_origin"):
+		wc.set_origin(start_position)
+	if player != null and wc.has_method("register_player"):
+		wc.register_player(player)
+	_autoload_registered = true
 
 
 ## --- Seleção: inicial, determinismo e compatibilidade ---

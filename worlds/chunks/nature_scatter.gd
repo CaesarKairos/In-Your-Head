@@ -3,27 +3,45 @@ extends RefCounted
 
 ## Scatter procedural de natureza (decoração visual) para Chunks.
 ##
-## Chamado UMA VEZ por chunk instanciada em tempo de jogo, logo após a chunk
-## entrar na árvore (ver WorldGenerator._load_chunk_at). Lê o TileMapLayer
-## "Ground" da própria chunk, considera elegíveis as células cujo atlas coord
-## é `background_atlas_coords` (grama lisa) e instancia Sprite2D decorativas
-## dentro de um container "Nature" filho da chunk.
+## Chamado UMA VEZ por chunk (diferido, na criação), logo após a chunk entrar na
+## árvore (ver WorldGenerator._scatter_deferred). Lê o TileMapLayer "Ground" da
+## própria chunk, considera elegíveis as células cujo atlas coord é
+## `background_atlas_coords` (grama lisa) e instancia props dentro de um
+## container "Nature" filho da chunk.
+##
+## Organicidade:
+##  - Distribuição estilo Poisson-disc simplificada: distância mínima entre props
+##    sólidos (18px) e entre árvores (30px), quebrando o padrão quadriculado e
+##    evitando sobreposição de colisões;
+##  - Jitter aleatório dentro da célula;
+##  - Variação de escala (0.85–1.15) e flip horizontal;
+##  - Mistura de tipos (sorteio ponderado por categoria) num mesmo cluster;
+##  - Container "Nature" com y_sort_enabled: props mais abaixo na tela desenham
+##    por cima de props mais acima, complementando a translucidez por oclusão.
 ##
 ## Determinismo: a semente é `world_seed` combinado com a posição de grid da
 ## chunk — os mesmos dois valores que definem QUAL chunk nasce na célula.
-## Como o gerador faz streaming (descarrega/recarrega chunks), sem isso a
+## Como o gerador faz streaming (descarrega/recarrega em pool), sem isso a
 ## vegetação mudaria a cada recarga da mesma célula.
-##
-## Profundidade: nesta etapa a natureza NÃO usa Y-sort. O container "Nature"
-## é adicionado como último filho da chunk, com z_index 0 (relativo): desenha
-## acima do Ground (que é opaco e viria por cima com z negativo) e abaixo do
-## Player, que aparece depois do WorldGenerator na árvore de world.tscn.
 
 const TILE_SIZE: int = 16
+const CHUNK_TILES: int = 33
 const PropScript: GDScript = preload("res://worlds/chunks/nature_prop.gd")
 
-## Fração das células elegíveis que recebe um prop (8–15%).
-const DENSITY: float = 0.12
+## Probabilidade por célula elegível de receber um prop (10%).
+const DENSITY: float = 0.10
+
+## Prop categorias consideradas sólidas (ganham StaticBody2D + colisão física).
+const SOLID_KINDS: Array[String] = ["tree", "bush", "rock"]
+## Prop que podem ocultar o jogador (copa alta) — ficam translúcidos por trás.
+const OCCLUDABLE_KINDS: Array[String] = ["tree", "bush"]
+
+## Distância mínima (px) entre props sólidos quaisquer.
+const MIN_SOLID_DIST: float = 18.0
+## Distância mínima (px) entre árvores (copas largas, mais espaçadas).
+const MIN_TREE_DIST: float = 30.0
+## Distância mínima (px) de um detalhe baixo a um prop sólido (evita invadir tronco).
+const MIN_DETAIL_DIST: float = 6.0
 
 ## Diretório base dos props (paleta Green combina com o tileset das chunks).
 const NATURE_DIR: String = "res://assets/props/Objects/Nature/"
@@ -108,37 +126,72 @@ static func scatter(chunk: Node2D, grid_pos: Vector2i, world_seed: int) -> void:
 	var bg_value = chunk.get("background_atlas_coords")
 	var background_coords: Vector2i = bg_value if bg_value != null else Vector2i(5, 0)
 
-	# Coleta células elegíveis: apenas tile de fundo liso (nunca estrada/borda).
+	# Coleta células elegíveis: apenas tile de fundo liso (nunca estrada/borda),
+	# pulando a margem de 1 tile para reduzir props cortados na emenda entre chunks.
 	var eligible: Array[Vector2i] = []
 	for cell in ground.get_used_cells():
+		if cell.x <= 0 or cell.x >= CHUNK_TILES - 1 \
+				or cell.y <= 0 or cell.y >= CHUNK_TILES - 1:
+			continue
 		if ground.get_cell_atlas_coords(cell) == background_coords:
 			eligible.append(cell)
 	if eligible.is_empty():
 		return
 
+	# Container da natureza com Y-sort ativo: props mais "baixos" na tela
+	# desenham por cima dos mais "altos", dando profundidade ao cluster.
 	var nature := Node2D.new()
 	nature.name = "Nature"
-	nature.z_index = 0  # relativo; acima do Ground (ordem na árvore), abaixo do Player
+	nature.z_index = 0
+	nature.y_sort_enabled = true
 	chunk.add_child(nature)
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _cell_seed(world_seed, grid_pos)
 
-	var count := int(round(eligible.size() * DENSITY))
-	# Embaralha deterministicamente e toma os `count` primeiros.
-	for i in range(eligible.size() - 1, 0, -1):
-		var j := rng.randi_range(0, i)
-		var tmp := eligible[i]
-		eligible[i] = eligible[j]
-		eligible[j] = tmp
+	var placed_solids: Array[Vector2] = []
+	var placed_trees: Array[Vector2] = []
 
-	for k in range(mini(count, eligible.size())):
-		var cell := eligible[k]
+	for cell in eligible:
+		# Decisão por probabilidade (determinística na ordem das células).
+		if rng.randf() > DENSITY:
+			continue
 		var pick := _pick(rng)
-		var texture: Texture2D = pick["texture"]
+		var kind := String(pick["kind"])
+		var texture := pick["texture"] as Texture2D
 		if texture == null:
 			continue
-		nature.add_child(_make_prop(texture, String(pick["kind"]), cell, rng))
+		var pos := _jittered_cell_pos(cell, rng)
+
+		if kind in SOLID_KINDS:
+			if not _min_distance_ok(pos, placed_solids, MIN_SOLID_DIST):
+				continue
+			if kind == "tree" and not _min_distance_ok(pos, placed_trees, MIN_TREE_DIST):
+				continue
+			placed_solids.append(pos)
+			if kind == "tree":
+				placed_trees.append(pos)
+		else:
+			# Detalhe baixo (grama/flor/cogumelo): só não invade o tronco de um sólido.
+			if not _min_distance_ok(pos, placed_solids, MIN_DETAIL_DIST):
+				continue
+
+		nature.add_child(_make_prop(texture, kind, pos, rng))
+
+
+## Centro da célula + jitter aleatório (quebra o padrão de grade).
+static func _jittered_cell_pos(cell: Vector2i, rng: RandomNumberGenerator) -> Vector2:
+	var base := Vector2(cell) * float(TILE_SIZE) + Vector2(TILE_SIZE, TILE_SIZE) * 0.5
+	var j := float(TILE_SIZE) * 0.4
+	return base + Vector2(rng.randf_range(-j, j), rng.randf_range(-j, j))
+
+
+## Verdadeiro se `pos` respeita `min_d` de TODOS os pontos de `list`.
+static func _min_distance_ok(pos: Vector2, list: Array[Vector2], min_d: float) -> bool:
+	for p in list:
+		if pos.distance_to(p) < min_d:
+			return false
+	return true
 
 
 
@@ -185,27 +238,29 @@ static func _load_texture(path: String) -> Texture2D:
 	return tex
 
 
-## Cria o nó do prop: NatureProp (colisão + oclusão) para árvores, arbustos,
-## tocos e pedras; Sprite2D simples para decoração baixa (grama, flores etc.).
-static func _make_prop(texture: Texture2D, kind: String, cell: Vector2i, rng: RandomNumberGenerator) -> Node2D:
-	var solid_kinds := ["tree", "bush", "rock"]
-	var occludable_kinds := ["tree", "bush"]
+## Cria o nó do prop: NatureProp (colisão + oclusão por coordenada) para árvores,
+## arbustos, tocos e pedras; Sprite2D simples para decoração baixa (grama, flores).
+## Aplica variação de escala e flip horizontal para quebrar a repetição visual.
+static func _make_prop(texture: Texture2D, kind: String, pos: Vector2, rng: RandomNumberGenerator) -> Node2D:
+	var flip := rng.randf() < 0.5
 	var node: Node2D
-	if kind in solid_kinds:
+	if kind in SOLID_KINDS:
 		var prop: Node2D = PropScript.new()
 		prop.set("texture", texture)
 		prop.set("solid", true)
-		prop.set("occludable", kind in occludable_kinds)
+		prop.set("occludable", kind in OCCLUDABLE_KINDS)
+		prop.set("flip_h", flip)
 		node = prop
 	else:
 		var sprite := Sprite2D.new()
 		sprite.texture = texture
 		sprite.centered = false
+		sprite.flip_h = flip
 		sprite.offset = Vector2(-texture.get_size().x / 2.0, -texture.get_size().y)
 		node = sprite
-	# Ancora a BASE do prop no centro da célula (com leve jitter), de modo que
-	# árvores/arbustos "plantem" no chão e não flutuem sobre a célula.
-	var jitter := float(TILE_SIZE) * 0.3
-	node.position = Vector2(cell) * float(TILE_SIZE) + Vector2(TILE_SIZE, TILE_SIZE) * 0.5
-	node.position += Vector2(rng.randf_range(-jitter, jitter), rng.randf_range(-jitter, jitter))
+	# A BASE do prop fica plantada na posição (o "pezinho" no chão).
+	node.position = pos
+	# Variação suave de escala (0.85–1.15), proporcional (sprite + colisão).
+	var s := 0.85 + rng.randf() * 0.3
+	node.scale = Vector2(s, s)
 	return node

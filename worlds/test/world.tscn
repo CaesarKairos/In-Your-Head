@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" uid="uid://bf6ffblpnxa31" path="res://scenes/weapons/shotgun/shotgun.tscn" id="5_shotgun"]
 [ext_resource type="PackedScene" uid="uid://biwck3lq60dcw" path="res://worlds/world_generator.tscn" id="6_wg"]
 [ext_resource type="Texture2D" uid="uid://dvyy63sy71dqo" path="res://assets/props/Objects/Container/Container_3_Gray_Horizontal.png" id="7_cimtp"]
+[ext_resource type="PackedScene" path="res://worlds/hud/coords_hud.tscn" id="8_coords"]
 
 [sub_resource type="RectangleShape2D" id="Rect_wall"]
 size = Vector2(40, 23)
@@ -40,3 +41,5 @@ shape = SubResource("Rect_wall")
 
 [node name="Sprite2D" type="Sprite2D" parent="Wall" unique_id=1136416177]
 texture = ExtResource("7_cimtp")
+
+[node name="CoordsHUD" parent="." unique_id=2459102 instance=ExtResource("8_coords")]

@@ -1,0 +1,28 @@
+[gd_scene format=3 uid="uid://bcoords0hsse0u1"]
+
+[ext_resource type="Script" path="res://worlds/hud/coords_hud.gd" id="1_hud"]
+
+[node name="CoordsHUD" type="CanvasLayer"]
+layer = 20
+script = ExtResource("1_hud")
+
+[node name="Margin" type="MarginContainer" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -210.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = 40.0
+grow_horizontal = 0
+
+[node name="Panel" type="PanelContainer" parent="Margin"]
+
+[node name="VBox" type="VBoxContainer" parent="Margin/Panel"]
+
+[node name="LabelCaption" type="Label" parent="Margin/Panel/VBox"]
+text = "Posição"
+modulate = Color(0.75, 0.85, 1, 1)
+
+[node name="LabelValue" type="Label" parent="Margin/Panel/VBox"]
+text = "Tile: (0, 0) | Chunk: (0, 0)"

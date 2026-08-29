@@ -8,7 +8,7 @@ var _done: bool = false
 
 
 func _initialize() -> void:
-	var gen_script: GDScript = load("res://worlds/world_generator.gd")
+	var gen_script: GDScript = load("res://scripts/world/world_generator.gd")
 	var gen: Node = gen_script.new()
 	var chunks := Node2D.new()
 	chunks.name = "Chunks"

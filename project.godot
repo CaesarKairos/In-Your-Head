@@ -11,8 +11,13 @@ config_version=5
 [application]
 
 config/name="In your Head"
+config/description="In Your Head is a top-down pixel-art survival roguelite focused on exploration, where the apocalypse didn’t just destroy society—it erased humanity’s memories. In a persistent open world, players take control of procedurally generated survivors, each carrying a unique past, lost connections, and painful absences. As they struggle to survive physical dangers and infected individuals who have lost their very identities, players explore the map to piece together two mysteries at once: the origin of the phenomenon that devastated the world, and the story of the person they are controlling before they die."
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
+
+[autoload]
+
+WorldCoordinates="*res://autoload/world_coordinates.gd"
 
 [display]
 
@@ -22,6 +27,7 @@ window/size/window_width_override=1280
 window/size/window_height_override=720
 window/stretch/mode="viewport"
 window/stretch/scale_mode="integer"
+mouse_cursor/custom_image="uid://bp7mmvtaacl60"
 
 [input]
 
@@ -124,7 +130,3 @@ textures/canvas_textures/default_texture_filter=0
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/default_filters/use_nearest_mipmap_filter=true
-
-[autoload]
-
-WorldCoordinates="*res://scripts/autoload/world_coordinates.gd"

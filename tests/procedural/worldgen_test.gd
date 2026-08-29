@@ -26,7 +26,7 @@ func _ready() -> void:
 	add_child(_fake)
 	_fake.global_position = _cell_to_world(Vector2i.ZERO)
 
-	_wg = load("res://worlds/world_generator.tscn").instantiate()
+	_wg = load("res://scenes/world/world_generator.tscn").instantiate()
 	# Desactiva la generación automática en _ready (la controlamos manualmente),
 	# pero la dejaremos activa para el streaming en movimiento.
 	_wg.set("regenerate_on_ready", false)

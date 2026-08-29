@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://biwck3lq60dcw"]
 
-[ext_resource type="Script" uid="uid://dlotn4qtt20x" path="res://worlds/world_generator.gd" id="1_wg"]
+[ext_resource type="Script" uid="uid://dlotn4qtt20x" path="res://scripts/world/world_generator.gd" id="1_wg"]
 [ext_resource type="PackedScene" uid="uid://c6iynd2mqst7x" path="res://worlds/chunks/chunk.tscn" id="2_chunk"]
 [ext_resource type="PackedScene" uid="uid://c1m57rms4dun1" path="res://worlds/chunks/crossroads_01.tscn" id="3_crossroads"]
 [ext_resource type="PackedScene" path="res://worlds/chunks/road_straight_h_01.tscn" id="4_h"]

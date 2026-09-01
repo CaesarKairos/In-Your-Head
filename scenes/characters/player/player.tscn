@@ -944,7 +944,7 @@ shape = SubResource("CapsuleShape2D_bcx1r")
 [node name="WeaponHolder" type="Node2D" parent="." unique_id=1349005886]
 visible = false
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1410043172]
+[node name="Body" type="CollisionShape2D" parent="." unique_id=1410043172]
 position = Vector2(0, -1)
 shape = SubResource("CapsuleShape2D_sja5g")
 

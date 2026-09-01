@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://bnpt0test0001"]
+
+[ext_resource type="Script" path="res://tests/nature_prop_test.gd" id="1_npt"]
+
+[node name="NaturePropTest" type="Node2D"]
+script = ExtResource("1_npt")

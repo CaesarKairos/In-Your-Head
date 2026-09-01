@@ -8,13 +8,15 @@ extends Node2D
 ##    plantado no chão);
 ##  - StaticBody2D + CollisionShape2D PEQUENA (círculo, 3–8px de raio) centrada
 ##    exatamente no tronco/base — nunca um retângulo cobrindo o cluster;
-##  - Oclusão translúcida baseada em COORDENADA (não em Area2D): cada prop sabe
-##    o tile do mundo onde está plantado e, via o autoload WorldCoordinates,
-##    compara com o tile atual do Player. Quando o Player está atrás do prop
-##    (mais ao norte / acima na tela) e dentro de uma janela lateral, o sprite
-##    fica translúcido (modulate.a -> FADED_ALPHA) e o z_index sobe para 1,
-##    desenhando o prop NA FRENTE do jogador com transparência. Ao sair dessa
-##    faixa, volta a 100% opaco e a z_index 0.
+##  - Oclusão translúcida POR PIXEL (não por tile, não por Area2D): cada prop
+##    deriva a janela de oclusão do tamanho REAL do próprio sprite
+##    (texture.get_size() * scale) e, a cada frame, compara com a posição em
+##    pixels do Player (WorldCoordinates.pixel_position + offset dos pés).
+##    Quando os PÉS do player estão atrás do prop (ao norte) e DENTRO da
+##    silhueta desenhada (copa), o sprite fica translúcido (modulate.a ->
+##    FADED_ALPHA) e o z_index sobe para 1, desenhando o prop NA FRENTE do
+##    jogador. Fora da silhueta (ao lado, na frente, ou acima do topo),
+##    volta a 100% opaco e a z_index 0.
 ##
 ## Por que coordenada em vez de Area2D? A forma antiga usava um RectangleShape2D
 ## na "copa" (região superior, y<0) que nunca se sobrepunha ao corpo do Player
@@ -25,11 +27,12 @@ extends Node2D
 const FADED_ALPHA: float = 0.45
 const TILE_SIZE: int = 16
 
-## Quantos tiles de altura (ao norte) o Player ainda conta como "atrás" do prop.
-const OCCLUDE_Y_SPAN: int = 2
-## Meia-largura em tiles da janela lateral de oclusão (evita desvanecer árvores
-## longe na mesma fileira).
-const OCCLUDE_X_SPAN: int = 2
+## Margem (px) adicionada à silhueta do sprite para a janela de oclusão.
+## Pequena: só compensa a granularidade do movimento entre frames.
+const OCCLUDE_MARGIN_PX: float = 2.0
+## Offset (px) da "base dos pés" do Player em relação à origem do seu
+## CharacterBody2D (a colisão do player é ancorada nos pés, ~7px abaixo).
+const PLAYER_FOOT_OFFSET_PX: float = 7.0
 
 @export var texture: Texture2D
 ## Colisão física na base (tronco/pedra). Arbustos grandes também são sólidos.
@@ -42,6 +45,9 @@ const OCCLUDE_X_SPAN: int = 2
 var _sprite: Sprite2D
 var _tween: Tween
 var _occluded: bool = false
+## Sentinela explícita: `Vector2i.ZERO` é um tile legítimo do mundo, então não
+## pode ser reaproveitado como "ainda não inicializado".
+var _plant_tile_ready: bool = false
 var _plant_tile: Vector2i = Vector2i.ZERO
 var _wc = null  # Variant: autoload WorldCoordinates (acesso dinâmico ao sinal)
 
@@ -77,37 +83,54 @@ func _ready() -> void:
 		if not _wc.coordinates_changed.is_connected(_on_coords_changed):
 			_wc.coordinates_changed.connect(_on_coords_changed)
 
-	if _plant_tile == Vector2i.ZERO:
-		call_deferred("_lazy_init")
-
-	if not occludable:
-		return
-	# Estado inicial (caso a origem coincida com (0,0), força reavaliação).
-	if _wc != null:
-		_on_coords_changed(_wc.tile_position, _wc.chunk_position)
+	# Tile de plantio: calculado diferido, após o prop estar posicionado na
+	# árvore da cena (global_position confiável só então).
+	call_deferred("_lazy_init")
 
 
 ## Calcula o tile de plantio após o nó estar devidamente posicionado na árvore
 ## (chunk já instanciada/posicionada). global_position reflete o nível do mundo.
 func _lazy_init() -> void:
-	if _plant_tile == Vector2i.ZERO:
-		_plant_tile = Vector2i(
-			floori(global_position.x / float(TILE_SIZE)),
-			floori(global_position.y / float(TILE_SIZE))
-		)
-		if _wc != null:
-			_on_coords_changed(_wc.tile_position, _wc.chunk_position)
-
-
-func _on_coords_changed(tile_position: Vector2i, _chunk_position: Vector2i) -> void:
-	if _plant_tile == Vector2i.ZERO:
+	if _plant_tile_ready:
 		return
-	# "Atrás" = o Player está ao NORTE (acima na tela) do prop: p.y < plant.y.
-	# dy > 0 => player ao norte; dy <= 0 => na mesma linha ou ao sul (na frente).
-	var dy: int = _plant_tile.y - tile_position.y
-	var dx: int = absi(tile_position.x - _plant_tile.x)
-	var occluded := dy > 0 and dy <= OCCLUDE_Y_SPAN and dx <= OCCLUDE_X_SPAN
+	_plant_tile_ready = true
+	_plant_tile = Vector2i(
+		floori(global_position.x / float(TILE_SIZE)),
+		floori(global_position.y / float(TILE_SIZE))
+	)
+
+
+func _on_coords_changed(_tile_position: Vector2i, _chunk_position: Vector2i) -> void:
+	# A checagem fina é feita por _process em pixels (o sinal só dispara a cada
+	# 16px de movimento, granularidade demais para uma janela de ~20px).
+	pass
+
+
+## Decide se o prop fica translúcido dado o ponto dos "pés" do Player em pixels.
+##
+## A silhueta do sprite (com offset = (-w/2, -h), base em y=0, escalada pelo nó)
+## cobre x em [-w/2, +w/2] e y em [-h, 0]. O Player só conta como "atrás" do
+## prop quando o ponto dos pés dele está DENTRO dessa silhueta vindo pelo norte:
+## assim, andar ao lado da copa (fora da largura desenhada) nunca translucida o
+## prop — correção do Bug 2 (janela fixa de 2 tiles era maior que a copa para
+## quase todos os sprites, e curta demais para as árvores grandes).
+func _update_occlusion(player_foot_px: Vector2) -> void:
+	if not occludable:
+		return
+	var size: Vector2 = texture.get_size() * scale
+	var half_w: float = size.x * 0.5 + OCCLUDE_MARGIN_PX
+	var dx: float = absf(player_foot_px.x - global_position.x)
+	var dy: float = global_position.y - player_foot_px.y
+	# dy > 0: pés do player ao norte (acima) da base do prop; o pé deve estar
+	# dentro da altura da copa para o prop cobri-lo visualmente.
+	var occluded := dy > 0.0 and dy <= size.y + OCCLUDE_MARGIN_PX and dx <= half_w
 	_set_occluded(occluded)
+
+
+func _process(_delta: float) -> void:
+	if _wc == null or not _plant_tile_ready:
+		return
+	_update_occlusion(_wc.pixel_position + Vector2(0.0, PLAYER_FOOT_OFFSET_PX))
 
 
 func _set_occluded(occluded: bool) -> void:

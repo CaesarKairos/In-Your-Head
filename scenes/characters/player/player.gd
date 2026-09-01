@@ -3,6 +3,9 @@ extends CharacterBody2D
 @export var walk_speed: float = 60.0
 @export var sprint_speed: float = 100.0
 
+# Tempo máximo entre dois toques para ativar a corrida.
+@export var double_tap_time: float = 0.25
+
 @onready var animated_sprite: AnimatedSprite2D = $MovimentSprite
 @onready var no_hands_sprite: AnimatedSprite2D = $MovimentSpriteNoHands
 @onready var weapon_holder: Node2D = $WeaponHolder
@@ -10,6 +13,11 @@ extends CharacterBody2D
 var last_direction := Vector2.DOWN
 var is_attacking := false
 var equipped_weapon: Weapon = null
+
+# Controle do duplo toque
+var last_move_action: String = ""
+var last_move_time: float = -1.0
+var double_tap_sprint_action: String = ""
 
 
 func _ready() -> void:
@@ -40,6 +48,9 @@ func _physics_process(_delta: float) -> void:
 		move_and_slide()
 		return
 
+	# Detecta duplo toque nas teclas de movimento
+	check_double_tap()
+
 	# Movimento
 	var input_direction := Input.get_vector(
 		"move_left",
@@ -48,7 +59,22 @@ func _physics_process(_delta: float) -> void:
 		"move_down"
 	)
 
-	var is_sprinting := Input.is_action_pressed("sprint")
+	# Shift OU duplo toque ativa corrida
+	var is_sprinting := (
+		Input.is_action_pressed("sprint")
+		or double_tap_sprint_action != ""
+	)
+
+	# Se a tecla do duplo toque foi solta, cancela a corrida por duplo toque
+	if double_tap_sprint_action != "":
+		if not Input.is_action_pressed(double_tap_sprint_action):
+			double_tap_sprint_action = ""
+
+	is_sprinting = (
+		Input.is_action_pressed("sprint")
+		or double_tap_sprint_action != ""
+	)
+
 	var current_speed := sprint_speed if is_sprinting else walk_speed
 
 	velocity = input_direction * current_speed
@@ -60,6 +86,29 @@ func _physics_process(_delta: float) -> void:
 		update_animation(false)
 
 	move_and_slide()
+
+
+func check_double_tap() -> void:
+	var actions := [
+		"move_left",
+		"move_right",
+		"move_up",
+		"move_down"
+	]
+
+	for action in actions:
+		if Input.is_action_just_pressed(action):
+			var current_time := Time.get_ticks_msec() / 1000.0
+
+			# Se apertou a mesma tecla duas vezes rapidamente
+			if action == last_move_action and current_time - last_move_time <= double_tap_time:
+				double_tap_sprint_action = action
+
+			# Guarda este toque
+			last_move_action = action
+			last_move_time = current_time
+
+			break
 
 
 func start_attack() -> void:

@@ -1,16 +1,16 @@
 extends Node2D
 
-## Teste del z-index de los proyectiles y de la auto-colisión.
+## Teste do z-index dos projéteis e da auto-colisão.
 ##
-## Verifica el comportamiento deseado:
-##   1. El proyectil es creado.
-##   2. El shooter (dueño del disparo) sigue siendo el Player correcto.
-##   3. El proyectil NUNCA queda por debajo del Ground (z=0), ni siquiera al mirar
-##      hacia arriba (caso que antes lo ponía en z=-1, detrás del suelo). Debe usar
-##      la capa explícita de proyectil (Weapon.Z_INDEX_PROJECTILE).
-##   4. El muzzle flash también usa la capa fija Z_INDEX_PROJECTILE (siempre encima
-##      del Ground), independientemente de la dirección de mira.
-##   5. Prueba las cuatro direcciones (up/down/left/right), con énfasis en "up".
+## Verifica o comportamento desejado:
+##   1. O projétil é criado.
+##   2. O shooter (dono do disparo) continua sendo o Player correto.
+##   3. O projétil NUNCA fica abaixo do Ground (z=0), nem mesmo ao mirar
+##      para cima (caso que antes o colocava em z=-1, atrás do solo). Deve usar
+##      a camada explícita de projétil (Weapon.Z_INDEX_PROJECTILE).
+##   4. O muzzle flash também usa a camada fixa Z_INDEX_PROJECTILE (sempre acima
+##      do Ground), independentemente da direção de mira.
+##   5. Testa as quatro direções (up/down/left/right), com ênfase em "up".
 
 var _failures: Array[String] = []
 var _player: CharacterBody2D
@@ -18,7 +18,7 @@ var _holder: Node2D
 var _ground: Node2D
 var _pistol: Node
 
-## Debe coincidir con Weapon.Z_INDEX_PROJECTILE (capa fija del proyectil y del flash).
+## Deve coincidir com Weapon.Z_INDEX_PROJECTILE (camada fixa do projétil e do flash).
 const Z_INDEX_PROJECTILE: int = 100
 const DIRECTIONS: Array[String] = ["up", "down", "left", "right"]
 
@@ -41,8 +41,8 @@ func _ready() -> void:
 	_holder = Node2D.new()
 	_holder.name = "WeaponHolder"
 	_player.add_child(_holder)
-	# Ground simulado con z_index 0 (como el TileMapLayer del mundo). Referencia
-	# de "suelo" para comprobar que el proyectil siempre se dibuja encima.
+	# Ground simulado com z_index 0 (como o TileMapLayer do mundo). Referência
+	# de "solo" para comprovar que o projétil sempre é desenhado acima.
 	_ground = Node2D.new()
 	_ground.name = "Ground"
 	_ground.z_index = 0
@@ -51,14 +51,14 @@ func _ready() -> void:
 
 	_pistol = load("res://scenes/weapons/pistol/pistol.tscn").instantiate()
 	if _pistol == null:
-		_failures.append("pistol no cargó")
+		_failures.append("pistol não carregou")
 		_finish()
 		return
 	_holder.add_child(_pistol)
 	await _wait(2)
 
 	for direction in DIRECTIONS:
-		# Reproduce la lógica de Player.update_weapon_holder(): arriba -> -1, resto -> 1.
+		# Reproduz a lógica de Player.update_weapon_holder(): cima -> -1, resto -> 1.
 		_holder.z_index = -1 if direction == "up" else 1
 		_verify_projectile(direction)
 		_verify_muzzle_flash(direction)
@@ -76,28 +76,28 @@ func _verify_projectile(direction: String) -> void:
 			if child is Bullet:
 				var b := child as Bullet
 				found = true
-				# 2) Shooter correcto (el Player que disparó).
+				# 2) Shooter correto (o Player que disparou).
 				var shooter: Node = b.get("_shooter")
 				if shooter != _player:
 					_failures.append(
-						"hacia " + direction + ": la bala no registró al shooter correcto"
+						"para " + direction + ": a bala não registrou o shooter correto"
 					)
-				# 3) Nunca por debajo del Ground (z=0).
+				# 3) Nunca abaixo do Ground (z=0).
 				if b.z_index < _ground.z_index:
 					_failures.append(
-						"hacia " + direction
-						+ ": la bala quedó por debajo del Ground (z=" + str(b.z_index) + ")"
+						"para " + direction
+						+ ": a bala ficou abaixo do Ground (z=" + str(b.z_index) + ")"
 					)
 				elif b.z_index < 1:
 					_failures.append(
-						"hacia " + direction
-						+ ": la bala quedó en la misma capa del Ground; debería estar encima"
+						"para " + direction
+						+ ": a bala ficou na mesma camada do Ground; deveria estar acima"
 					)
-				# 5) Usa la capa explícita de proyectil, independiente del arma.
+				# 5) Usa a camada explícita de projétil, independente da arma.
 				if b.z_index != Z_INDEX_PROJECTILE:
 					_failures.append(
-						"hacia " + direction
-						+ ": la bala no usa la capa explícita de proyectil (z="
+						"para " + direction
+						+ ": a bala não usa a camada explícita de projétil (z="
 						+ str(b.z_index) + ")"
 					)
 				child.free()
@@ -105,8 +105,8 @@ func _verify_projectile(direction: String) -> void:
 		if found:
 			break
 	if not found:
-		_failures.append("hacia " + direction + ": la bala no fue creada")
-	# Limpia cualquier spawn residual de este disparo.
+		_failures.append("para " + direction + ": a bala não foi criada")
+	# Limpa qualquer spawn residual deste disparo.
 	for child in get_children():
 		if child is Bullet:
 			child.free()
@@ -126,8 +126,8 @@ func _verify_muzzle_flash(direction: String) -> void:
 				# 4) O muzzle flash conserva a capa fixa do projetil.
 				if child.z_index != expected_z:
 					_failures.append(
-						"hacia " + direction
-						+ ": muzzle flash z_index distinto da capa fixa (flash="
+						"para " + direction
+						+ ": muzzle flash com z_index diferente da camada fixa (flash="
 						+ str(child.z_index) + ", esperado=" + str(expected_z) + ")"
 					)
 				child.free()
@@ -135,7 +135,7 @@ func _verify_muzzle_flash(direction: String) -> void:
 		if found:
 			break
 	if not found:
-		_failures.append("hacia " + direction + ": el muzzle flash no fue creado")
+		_failures.append("para " + direction + ": o muzzle flash não foi criado")
 	for child in get_children():
 		if child is MuzzleFlash:
 			child.free()
@@ -148,9 +148,9 @@ func _wait(n: int) -> void:
 
 func _finish() -> void:
 	if _failures.is_empty():
-		print("=== SELF-HIT TEST OK: proyectil y muzzle flash siempre encima del Ground ===")
+		print("=== SELF-HIT TEST OK: projétil e muzzle flash sempre acima do Ground ===")
 	else:
-		print("=== SELF-HIT TEST ERRORES ===")
+		print("=== SELF-HIT TEST ERROS ===")
 		for er in _failures:
 			print(" - " + er)
 	get_tree().quit(1 if _failures.size() > 0 else 0)

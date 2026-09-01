@@ -356,3 +356,5 @@ west_connector = 1
 
 [node name="Ground" type="TileMapLayer" parent="." unique_id=31867094]
 tile_set = SubResource("TileSet_6t25d")
+
+[node name="BuildingPoints" type="Node2D" parent="."]

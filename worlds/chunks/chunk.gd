@@ -56,10 +56,19 @@ enum Enabled {
 		show_in_game = value
 		queue_redraw()
 
+# ============================================================================
+#  FICHA DE CONFIGURAÇÃO DA CHUNK
+# ----------------------------------------------------------------------------
+#  Esta Chunk concentra, de forma organizada, todas as propriedades que
+#  definem a identidade e as regras da sua região. O WorldGenerator apenas lê
+#  e instancia; a "inteligência" da região vive aqui.
+# ============================================================================
+
 @export_category("Identidade")
 
-## Identificador único da Chunk (ex.: "crossroad_01").
+## Identificador único da Chunk (ex.: "crossroads_01").
 ## Usado pelo WorldGenerator e, futuramente, por chunks especiais.
+## NÃO é derivado automaticamente do nome do arquivo.
 @export var chunk_id: String = ""
 
 @export_category("Bioma")
@@ -81,14 +90,23 @@ enum Enabled {
 ## Conector na borda OESTE (esquerda).
 @export var west_connector: ConnectorType = ConnectorType.NONE
 
-@export_category("Conectores Especiais")
-
-## Conectores diagonais (planejados para o futuro). Não participam da geração nesta etapa.
-
+## Conectores DIAGONAIS (informação secundária). Não participam da geração
+## de conectores cardeais e não bloqueiam a geração nesta etapa.
 @export var northeast_connector: ConnectorType = ConnectorType.NONE
 @export var northwest_connector: ConnectorType = ConnectorType.NONE
 @export var southeast_connector: ConnectorType = ConnectorType.NONE
 @export var southwest_connector: ConnectorType = ConnectorType.NONE
+
+@export_category("Conexões Especiais")
+
+## Conexões ESPECIAIS: indicam qual Chunk obrigatoriamente precisa existir
+## nesta direção (ex.: special_north = "Hospital_02"). Diferem dos conectores
+## normais e são preparadas para futuras estruturas multi-chunk.
+## Valor vazio ("") = nenhuma Chunk específica é obrigatória nesta direção.
+@export var special_north: StringName = &""
+@export var special_south: StringName = &""
+@export var special_east: StringName = &""
+@export var special_west: StringName = &""
 
 @export_category("Geração")
 
@@ -97,8 +115,47 @@ enum Enabled {
 ## células cujo atlas coord no "Ground" seja este.
 @export var background_atlas_coords: Vector2i = Vector2i(5, 0)
 
-# Dados de geração pertencem ao WorldGenerator, não à Chunk.
-# O comentário acima reserva a categoria no Inspector.
+## Densidades internas de geração DA CHUNK. Ficam expostas para consulta futura;
+## a integração completa com o NatureScatter acontece em outra etapa.
+@export var tree_density: float = 0.13
+@export var bush_density: float = 0.24
+@export var debris_density: float = 0.08
+
+@export_category("Inimigos")
+
+## Densidade/probabilidade geral de presença de inimigos nesta Chunk.
+## A geração de inimigos NÃO é implementada nesta etapa (dados apenas).
+@export var enemy_density: float = 0.5
+
+## Pesos por tipo de inimigo (chave = id real do tipo, valor = peso).
+## São PESOS, não probabilidades independentes; o total não precisa ser 100.
+## Tipos atuais do projeto (apenas assets; classes/cenas ainda não existem):
+##   Zombie_Small / Zombie_Axe / Zombie_Big
+## O WorldGenerator e a Chunk não criam inimigos nesta etapa.
+@export var enemy_type_weights: Dictionary = {
+	"Zombie_Small": 70,
+	"Zombie_Axe": 20,
+	"Zombie_Big": 10
+}
+
+@export_category("Itens")
+
+## Chances de spawn de itens da Chunk. Regra do projeto: cada item tem sua
+## própria chance INDEPENDENTE (não precisa somar 1.0).
+## Campos: item_id, spawn_chance, opcionalmente min_spawn / max_spawn.
+## A geração de itens NÃO é implementada nesta etapa (dados apenas).
+@export var item_spawn_table: Array[Dictionary] = [
+	{"item_id": "bandage", "spawn_chance": 0.20, "min_spawn": 0, "max_spawn": 2},
+	{"item_id": "ammo", "spawn_chance": 0.20, "min_spawn": 0, "max_spawn": 3},
+	{"item_id": "food", "spawn_chance": 0.20, "min_spawn": 0, "max_spawn": 2}
+]
+
+@export_category("Edificações")
+
+## Caminho do contêiner de pontos de edificação da Chunk. O nó BuildingPoints
+## é um Node2D que futuramente receberá filhos Marker2D (um por ponto de
+## construção), evitando refazer a cena. Nesta etapa nada é construído.
+@export var building_points_path: NodePath = ^"BuildingPoints"
 
 
 func _ready() -> void:
@@ -108,6 +165,17 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	if Engine.is_editor_hint():
 		queue_redraw()
+
+
+## Garante (e retorna) o contêiner de pontos de edificação da Chunk, criando-o
+## sob demanda caso ainda não exista (etapa futura de edificações/construções).
+func ensure_building_points() -> Node2D:
+	var node := get_node_or_null(building_points_path) as Node2D
+	if node == null:
+		node = Node2D.new()
+		node.name = "BuildingPoints"
+		add_child(node)
+	return node
 
 
 func _draw() -> void:

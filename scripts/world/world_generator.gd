@@ -26,9 +26,6 @@ const BASE_CHUNK_SCENE: String = "res://worlds/chunks/chunk.tscn"
 ## É a ÚNICA forma de converter uma coordenada de grid em posição de mundo.
 const GRID_SPACING: int = CHUNK_SIZE
 
-## Máximo de Chunks reintroduzidas na árvore por frame (distribui a instanciação
-## ao longo de vários frames em vez de estourar o frame da transição).
-const MAX_COMMITS_PER_FRAME: int = 1
 ## Limite de instâncias ociosas guardadas no pool por tipo de chunk.
 const POOL_LIMIT_PER_TYPE: int = 6
 
@@ -62,6 +59,16 @@ const ALL_DIRECTIONS: Array[int] = [Direction.NORTH, Direction.EAST, Direction.S
 
 ## Raio de descarga: células além desta distância são liberadas da memória.
 @export var unload_radius_chunks: int = 8
+
+## Máximo de Chunks instanciadas (commit) por frame. Distribui o custo ao longo
+## dos frames e evita travamento. Valor inicial conservador; aumente apenas se o
+## carregamento parecer lento sem causar stutter.
+@export var max_commits_per_frame: int = 3
+
+## Imprime logs mínimos de streaming: coordenada carregada, descarregada e a
+## prioridade da Chunk quando entra na fila. Fica atrás dessa flag para não
+## poluir o console por padrão.
+@export var debug_stream_logs: bool = false
 
 ## Semente determinística do mundo. Mesmo valor -> mesmas Chunks nas mesmas células.
 @export var world_seed: int = 1337
@@ -99,6 +106,8 @@ const DEFAULT_WEIGHT_RULES: Array = [
 # Estado de stream.
 var _loaded_chunks: Dictionary = {}         # key: Vector2i (célula) -> Node2D (instância)
 var _player_last_cell: Vector2i = Vector2i(0, -1000000)  # sentinela impossível
+var _player_move_dir: Vector2i = Vector2i.ZERO            # última direção dominante (para prioridade leve à frente)
+var _have_prev_cell: bool = false
 var _chunk_meta_cache: Dictionary = {}      # path -> Dictionary (conectores)
 var _generatable_cache: Array[PackedScene] = []
 var _generatable_cache_dirty: bool = true
@@ -142,6 +151,14 @@ func _physics_process(_delta: float) -> void:
 		return
 	var prev := _player_last_cell
 	_player_last_cell = cell
+	if _have_prev_cell:
+		# Direção dominante do deslocamento (preferência leve à frente do Player).
+		var move := cell - prev
+		if absi(move.x) >= absi(move.y):
+			_player_move_dir = Vector2i(signi(move.x), 0)
+		else:
+			_player_move_dir = Vector2i(0, signi(move.y))
+	_have_prev_cell = true
 	_prefetch_ahead(prev, cell, player)
 
 
@@ -168,6 +185,8 @@ func clear_world() -> void:
 	_desired_cells.clear()
 	_loaded_chunks.clear()
 	_player_last_cell = Vector2i(0, -1000000)
+	_player_move_dir = Vector2i.ZERO
+	_have_prev_cell = false
 	_generatable_cache_dirty = true
 
 
@@ -276,7 +295,7 @@ func _request_load(cell: Vector2i, scene: PackedScene) -> void:
 
 
 ## Poll dos carregamentos e commit de POUCAS chunks por frame
-## (MAX_COMMITS_PER_FRAME), distribuindo a instanciação ao longo dos frames.
+## (max_commits_per_frame), distribuindo a instanciação ao longo dos frames.
 ## Recursos já em cache (a maioria: descobertos em generate_world) entram sem
 ## espera; os que nunca foram cached dependem do load_threaded_request do prefetch.
 func _commit_ready(player_cell: Vector2i) -> void:
@@ -286,14 +305,18 @@ func _commit_ready(player_cell: Vector2i) -> void:
 			ready.append(cell)
 	if ready.is_empty():
 		return
-	# Ordem determinística linha-a-coluna (norte/oeste antes de sul/leste).
+	# Ordem por PRIORIDADE: mais próximo do Player primeiro (distância ao quadrado);
+	# desempates por direção de movimento e, por fim, determinístico por linha-coluna.
 	ready.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-		if a.y != b.y:
-			return a.y < b.y
-		return a.x < b.x)
-	var n := mini(MAX_COMMITS_PER_FRAME, ready.size())
+		return _chunk_priority_less(a, b, player_cell))
+	var n := mini(maxi(1, max_commits_per_frame), ready.size())
 	for i in n:
 		var cell := ready[i]
+		if debug_stream_logs:
+			print(
+				"[WorldGenerator] Enfileirada grid %s (prioridade %d)"
+				% [cell, _priority_order(cell, player_cell)]
+			)
 		# Se ficou longe demais enquanto carregava, descarta (não entra no mundo).
 		if _chebyshev(cell, player_cell) > unload_radius_chunks:
 			_pending.erase(cell)
@@ -370,6 +393,8 @@ func _unload_chunk(grid_pos: Vector2i) -> void:
 		chunks.remove_child(inst)
 		_push_pool(inst)
 	_loaded_chunks.erase(grid_pos)
+	if debug_stream_logs:
+		print("[WorldGenerator] Chunk descarregada grid %s" % grid_pos)
 
 
 ## Guarda a instância no pool (oculta, longe da câmera) ou libera se o tipo
@@ -730,6 +755,47 @@ func _world_to_grid(world_pos: Vector2) -> Vector2i:
 
 func _chebyshev(a: Vector2i, b: Vector2i) -> int:
 	return max(absi(a.x - b.x), absi(a.y - b.y))
+
+
+## Regra de ordem usada na fila de carregamento: o que está mais perto do Player
+## (distância ao quadrado) entra/commita primeiro. Empates são quebrados por
+## direção de movimento (leve preferência à frente) e, por fim, de forma
+## determinística por linha-coluna. Usa distância de GRID (Vector2i), nunca pixels.
+func _chunk_priority_less(a: Vector2i, b: Vector2i, player_cell: Vector2i) -> bool:
+	var da := a - player_cell
+	var db := b - player_cell
+	var dist_a := da.x * da.x + da.y * da.y
+	var dist_b := db.x * db.x + db.y * db.y
+	if dist_a != dist_b:
+		return dist_a < dist_b
+	var ba := _movement_priority_bonus(a, player_cell)
+	var bb := _movement_priority_bonus(b, player_cell)
+	if ba != bb:
+		return ba < bb
+	if a.y != b.y:
+		return a.y < b.y
+	return a.x < b.x
+
+
+## Bônus leve (menor valor = mais prioridade) para células à frente do Player,
+## na direção dominante do último deslocamento. Não muda a ordem por distância;
+## apenas desempata células a uma mesma distância.
+func _movement_priority_bonus(cell: Vector2i, player_cell: Vector2i) -> int:
+	if _player_move_dir == Vector2i.ZERO:
+		return 0
+	var d := cell - player_cell
+	var bonus := 0
+	if _player_move_dir.x != 0 and signi(d.x) == _player_move_dir.x:
+		bonus -= 1
+	if _player_move_dir.y != 0 and signi(d.y) == _player_move_dir.y:
+		bonus -= 1
+	return bonus
+
+
+## Chave numérica de prioridade para logs de debug (menor = carregado antes).
+func _priority_order(cell: Vector2i, player_cell: Vector2i) -> int:
+	var d := cell - player_cell
+	return d.x * d.x + d.y * d.y + _movement_priority_bonus(cell, player_cell)
 
 
 ## --- Helpers ---

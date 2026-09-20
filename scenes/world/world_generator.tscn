@@ -12,8 +12,10 @@
 [ext_resource type="PackedScene" path="res://worlds/chunks/road_deadend_n_01.tscn" id="10_dead"]
 
 [node name="WorldGenerator" type="Node2D" unique_id=31793560]
+y_sort_enabled = true
 script = ExtResource("1_wg")
 chunk_pool = Array[PackedScene]([ExtResource("3_crossroads"), ExtResource("4_h"), ExtResource("5_v"), ExtResource("6_ne"), ExtResource("7_nw"), ExtResource("8_se"), ExtResource("9_sw"), ExtResource("10_dead")])
 excluded_chunks = Array[PackedScene]([ExtResource("2_chunk")])
 
 [node name="Chunks" type="Node2D" parent="." unique_id=1102496075]
+y_sort_enabled = true

@@ -13,6 +13,7 @@
 size = Vector2(40, 23)
 
 [node name="World" type="Node2D" unique_id=677433516]
+y_sort_enabled = true
 
 [node name="WorldGenerator" parent="." unique_id=517536973 instance=ExtResource("6_wg")]
 player_follow_path = "../Player"

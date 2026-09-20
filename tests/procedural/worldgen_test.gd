@@ -3,8 +3,7 @@ extends Node2D
 ## Validação do streaming de Chunks do WorldGenerator.
 ##
 ## Verifica:
-##   B) crossroads_01 se repete como vizinha de si mesma (é a única chunk do jogo),
-##      preenchendo (0,0) e as células ao redor em todas as direções.
+##   B) crossroads_01 ocupa (0,0); as demais cenas preenchem as vizinhanças.
 ##   C) O mundo se expande para norte, sul, leste e oeste, com 528 px entre células
 ##      adjacentes (sem buracos nem sobreposição).
 ##   D) Em cada posição se escolhe uma candidata compatível com TODAS as vizinhas.
@@ -86,12 +85,10 @@ func _cell_map() -> Dictionary:
 
 
 func _check_initial_cells() -> void:
-	# B) crossroads_01 se repete em toda célula (ela é a única chunk disponível).
+	# B) Apenas a célula inicial é obrigatoriamente crossroads_01.
 	if not _initial_map.has(Vector2i.ZERO) or _initial_map[Vector2i.ZERO] != "crossroads_01":
 		_failures.append("a célula (0,0) não é crossroads_01")
-	for key in _initial_map:
-		if _initial_map[key] != "crossroads_01":
-			_failures.append("célula " + str(key) + " não é crossroads_01 (é " + _initial_map[key] + ")")
+	_check_connectors()
 
 	# C) Devem existir as 9 células do quadrado ±1 sem duplicatas.
 	if _initial_map.size() != 9:
@@ -131,6 +128,7 @@ func _move_to(c: Vector2i) -> void:
 	# Carga assíncrona: dá tempo ao anel de ~9 células novas + gating norte/oeste.
 	await _wait(150)  # deixa correr vários _physics_process/_process do gerador
 
+	_check_connectors()
 
 func _expect_has(c: Vector2i, label: String) -> void:
 	var m := _cell_map()
@@ -146,12 +144,27 @@ func _check_determinism() -> void:
 	# Com a mesma seed, as células originais produzem as mesmas Chunks.
 	for cell in _initial_map:
 		if not m.has(cell):
+			_failures.append("Celula ausente ao retornar: " + str(cell))
 			continue
 		if m[cell] != _initial_map[cell]:
 			_failures.append(
 				"determinismo quebrado: célula " + str(cell)
 				+ " era " + str(_initial_map[cell]) + " e voltou como " + str(m[cell])
 			)
+
+
+func _check_connectors() -> void:
+	var loaded: Dictionary = _wg.get("_loaded_chunks")
+	for cell in loaded:
+		var chunk: Node2D = loaded[cell]
+		for offset in [Vector2i.RIGHT, Vector2i.DOWN]:
+			if not loaded.has(cell + offset):
+				continue
+			var neighbor: Node2D = loaded[cell + offset]
+			var side := "east_connector" if offset == Vector2i.RIGHT else "south_connector"
+			var opposite := "west_connector" if offset == Vector2i.RIGHT else "north_connector"
+			if chunk.get(side) != neighbor.get(opposite):
+				_failures.append("Conectores desconectados em " + str(cell))
 
 
 func _finish() -> void:

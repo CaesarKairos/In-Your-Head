@@ -159,6 +159,12 @@ enum Enabled {
 
 
 func _ready() -> void:
+	# Terreno separado da composição dos atores, inclusive entre chunks.
+	y_sort_enabled = true
+	var ground := get_node_or_null("Ground") as TileMapLayer
+	if ground:
+		ground.z_index = -1
+	set_process(Engine.is_editor_hint())
 	queue_redraw()
 
 

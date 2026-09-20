@@ -8,9 +8,9 @@ extends Node2D
 @onready var fire_sprite: AnimatedSprite2D = $AnimatedSprite2D
 
 
-## Define a posição local (a cena raiz de disparo costuma estar na origem).
+## Recebe a posição mundial do cano, mesmo com uma cena raiz deslocada.
 func set_flash_position(pos: Vector2) -> void:
-	position = pos
+	global_position = pos
 
 
 ## Toca a animação de clarão correspondente à direção cardinal.

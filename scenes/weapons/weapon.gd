@@ -22,11 +22,11 @@ signal reload_finished
 @export var magazine_size: int = 6
 ## Munição atual dentro do carregador.
 @export var current_ammo: int = 6
-## Tempo configurável de recarga. A finalização visual está sincronizada
-## com a animação reload_<direção> (não é usado um Timer separado).
+## Duração nominal mantida como dado de configuração. A duração efetiva atual
+## vem dos frames/FPS de reload_<direção>, sem Timer separado.
 @export var reload_time: float = 1.25
 
-## Posicao da empunhadura da arma em relacao ao Player (preenchido pelo Player).
+## Empunhadura relativa ao Player, usada quando grip_offsets não define a direção.
 @export var grip_offset := Vector2.ZERO
 
 ## Posicao da empunhadura por direcao (up, down, left, right).
@@ -64,15 +64,7 @@ var current_direction := "right"
 # Marca de tempo do último disparo (ms) para o cooldown.
 var _last_shot_at: int = -1000000
 
-## Camada explícita de renderização para os projéteis e clarões.
-##
-## A bala e o clarão são instanciados diretamente na cena atual (não dentro do WeaponHolder),
-## por isso NÃO dependem do z_index do WeaponHolder (que varia com a direção de mira).
-## Ao mirar para cima, o WeaponHolder fica em `z_index = -1` (atrás do corpo) e,
-## se o projétil usasse essa mesma camada, ficaria atrás do Ground (que vive em
-## z_index 0). Este valor é sempre superior a 0 (Ground) e ao intervalo da
-## arma/corpo (-1..1), garantindo que o projétil nunca seja desenhado atrás do
-## solo, independente da direção.
+## Camada de efeitos preservada; independente da ordem interna do Player.
 const Z_INDEX_PROJECTILE: int = 100
 
 
@@ -80,8 +72,7 @@ func _ready() -> void:
 	animated_sprite.animation_finished.connect(_on_animation_finished)
 
 	# Garante que a composição visível inicial está sincronizada.
-	update_visual(get_direction_from_animation(animated_sprite.animation))
-	update_muzzle(current_direction)
+	play_movement_animation("idle", get_direction_from_animation(animated_sprite.animation))
 
 
 ## Retorna o offset de empunhadura para uma direcao.
@@ -126,7 +117,7 @@ func play_movement_animation(state: String, direction: String) -> void:
 	if animated_sprite.sprite_frames.get_frame_count(animation_name) == 0:
 		return
 
-	if animated_sprite.animation != animation_name:
+	if animated_sprite.animation != animation_name or not animated_sprite.is_playing():
 		animated_sprite.play(animation_name)
 
 	# Sincroniza a correção visual com o estado/direção atual.
@@ -165,6 +156,7 @@ func attack(direction: String = "right") -> bool:
 		return true
 
 	# Aplica a correcao visual do tiro antes de tocar a animacao.
+	animated_sprite.stop()
 	animated_sprite.play(animation_name)
 	update_visual(direction, "shoot")
 
@@ -179,6 +171,7 @@ func finish_attack() -> void:
 		return
 
 	is_attacking = false
+	play_movement_animation("idle", current_direction)
 	attack_finished.emit()
 
 
@@ -249,6 +242,7 @@ func spawn_muzzle_flash(direction: String) -> void:
 
 	var scene := get_tree().current_scene
 	if not scene:
+		flash.free()
 		return
 
 	# add_child.call_deferred evita erros se spawn_muzzle_flash for chamado em _ready.
@@ -279,6 +273,7 @@ func start_reload(direction: String) -> void:
 		return
 
 	animated_sprite.play(animation_name)
+	update_visual(direction, "reload")
 	print(weapon_name + ": recarregando...")
 
 

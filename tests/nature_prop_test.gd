@@ -41,6 +41,15 @@ func _run_cases(tex_path: String, w: float, h: float) -> void:
 	prop.set("scale", Vector2.ONE)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	var sprite: Sprite2D = prop.get("_sprite")
+	if sprite.region_enabled or sprite.texture is AtlasTexture:
+		_failures.append("Prop usa recorte inesperado: " + tex_path)
+	if not sprite.get_rect().size.is_equal_approx(tex.get_size()):
+		_failures.append("Tamanho visual diferente da textura: " + tex_path)
+	if not is_zero_approx(sprite.get_rect().end.y):
+		_failures.append("Base do sprite fora da origem: " + tex_path)
+	if prop.clip_children != CanvasItem.CLIP_CHILDREN_DISABLED:
+		_failures.append("Prop clipa os filhos: " + tex_path)
 
 	# Dentro da copa, atrás (norte) -> translúcido.
 	var dy_in := minf(20.0, h * 0.5)
@@ -55,6 +64,10 @@ func _run_cases(tex_path: String, w: float, h: float) -> void:
 	# Limite exato da largura (dentro da silhueta) -> translúcido.
 	_check(prop, Vector2(1000 + w * 0.5, 1000 - h * 0.5), true,
 			tex_path + ": na borda da copa ao norte")
+	if prop.z_index != 0:
+		_failures.append("Oclusao alterou a camada do prop")
+	prop.scale = Vector2(2, 2)
+	_check(prop, Vector2(1000 + w * 0.75, 1000 - h * 1.5), true, "Textura escalada")
 
 	prop.queue_free()
 	await get_tree().process_frame

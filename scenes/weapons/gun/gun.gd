@@ -31,7 +31,7 @@ func _ready() -> void:
     grip_offset = Vector2(0, 4)
     grip_offsets = {
         "down": Vector2(0, 4),
-        "up": Vector2(0, 4),
+        "up": Vector2(4, 0),
         "left": Vector2(-2, 3),
         "right": Vector2(2, 3),
     }
@@ -54,7 +54,7 @@ func _ready() -> void:
     # (y=-2 empurra para cima).
     muzzle_offsets = {
         "down": Vector2(0, 12),
-        "up": Vector2(0, -14),
+        "up": Vector2(0, -12),
         "left": Vector2(-9, -2),
         "right": Vector2(8, -2),
     }

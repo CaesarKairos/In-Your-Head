@@ -26,7 +26,7 @@ var _shooter: CharacterBody2D = null
 ## shooter serve para adicionar uma exceção de colisão: a bala não deve
 ## colidir com o corpo que a criou (o Player), mesmo nascendo bem perto dele.
 func setup(initial_position: Vector2, aim_dir: Vector2, shot_damage: int, bullet_texture: Texture2D, proj_max_distance: float, shooter: CharacterBody2D = null) -> void:
-    position = initial_position
+    global_position = initial_position
     direction = aim_dir.normalized()
     damage = shot_damage
     max_distance = proj_max_distance
@@ -56,8 +56,6 @@ func _physics_process(delta: float) -> void:
         queue_free()
         return
 
-    update_sprite_rotation()
-
 ## Rotaciona/vira o sprite para que a bala aponte para onde vai.
 func update_sprite_rotation() -> void:
     if not body_sprite:
@@ -73,6 +71,6 @@ func update_sprite_rotation() -> void:
         body_sprite.rotation = 0
 
 func _exit_tree() -> void:
-    if _shooter:
+    if is_instance_valid(_shooter):
         remove_collision_exception_with(_shooter)
         _shooter = null

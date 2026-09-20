@@ -746,7 +746,7 @@ script = ExtResource("1_gun")
 
 [node name="Sprite2D" type="AnimatedSprite2D" parent="." unique_id=924636532]
 sprite_frames = SubResource("SpriteFrames_Gun")
-animation = &"reload_up"
+animation = &"idle_down"
 
 [node name="MuzzlePoint" type="Marker2D" parent="." unique_id=552060136]
 position = Vector2(8, 0)

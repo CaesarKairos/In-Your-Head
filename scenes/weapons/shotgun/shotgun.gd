@@ -1,8 +1,7 @@
 class_name Shotgun
 extends Weapon
 
-# Shotgun: por enquanto um único projétil para validar a arquitetura.
-# Não implementa ainda máquina de recarga por cartuchos nem spread.
+# Recarga do carregador inteiro; cada disparo cria um leque de pellets.
 
 func _ready() -> void:
     super._ready()
@@ -29,7 +28,7 @@ func _ready() -> void:
     grip_offset = Vector2(0, 4)
     grip_offsets = {
         "down": Vector2(0, 4),
-        "up": Vector2(0, 4),
+        "up": Vector2(4, 0),
         "left": Vector2(-2, 3),
         "right": Vector2(2, 3),
     }
@@ -50,7 +49,7 @@ func _ready() -> void:
 
     muzzle_offsets = {
         "down": Vector2(0, 11),
-        "up": Vector2(0, -13),
+        "up": Vector2(0, -11),
         "left": Vector2(-10, -2),
         "right": Vector2(10, -2),
     }

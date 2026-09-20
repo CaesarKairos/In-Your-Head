@@ -120,6 +120,8 @@ var _pending: Dictionary = {}               # cell -> {path} (load em andamento)
 var _prefetch_paths: Dictionary = {}        # path -> true (recursos já pré-buscados)
 var _pool: Dictionary = {}                  # path -> Array[Node2D] instâncias ociosas
 var _pool_root: Node2D = null
+## Guarda escolhas (inclusive pendentes) para preservar estradas ao revisitar.
+var _chosen_scenes: Dictionary[Vector2i, PackedScene] = {}
 
 
 func _ready() -> void:
@@ -184,6 +186,7 @@ func clear_world() -> void:
 	_pending.clear()
 	_desired_cells.clear()
 	_loaded_chunks.clear()
+	_chosen_scenes.clear()
 	_player_last_cell = Vector2i(0, -1000000)
 	_player_move_dir = Vector2i.ZERO
 	_have_prev_cell = false
@@ -288,6 +291,7 @@ func _is_cell_ready(cell: Vector2i) -> bool:
 ## limite de 1 por frame). O resource já é pré-buscado de antemão por _prefetch
 ## (load_threaded_request); o _commit_ready faz o load_threaded_get correspondente.
 func _request_load(cell: Vector2i, scene: PackedScene) -> void:
+	_chosen_scenes[cell] = scene
 	var path := scene.resource_path
 	if not _prefetch_paths.has(path):
 		_prefetch(path)
@@ -367,16 +371,14 @@ func _finalize_chunk(cell: Vector2i, reused_inst: Node2D, scene: PackedScene) ->
 	inst.set_meta("source_path", scene.resource_path)
 	# Scatter pesado (dezenas de corpos físicos) vai para o fim da frame.
 	call_deferred("_scatter_deferred", inst, cell)
-	print(
-		"[WorldGenerator] Chunk grid %s -> %s"
-		% [cell, scene.resource_path.get_file().get_basename()]
-	)
+	if debug_stream_logs:
+		print("[WorldGenerator] Chunk grid %s -> %s" % [cell, scene.resource_path.get_file().get_basename()])
 
 
 ## Povoa a natureza de uma chunk de forma diferida (evita o pico de custo no
 ## frame da transição). Remove qualquer container "Nature" prévio (reuso do pool).
 func _scatter_deferred(chunk: Node2D, cell: Vector2i) -> void:
-	if not is_instance_valid(chunk):
+	if not is_instance_valid(chunk) or _loaded_chunks.get(cell) != chunk:
 		return
 	var existing := chunk.get_node_or_null("Nature")
 	if existing != null:
@@ -491,6 +493,8 @@ func _register_with_autoload(player: Node2D) -> void:
 ## --- Seleção: inicial, determinismo e compatibilidade ---
 
 func _choose_chunk_for_position(grid_pos: Vector2i) -> PackedScene:
+	if _chosen_scenes.has(grid_pos):
+		return _chosen_scenes[grid_pos]
 	# A célula (0,0) sempre é a Chunk inicial definida.
 	if grid_pos == Vector2i.ZERO and start_chunk_scene:
 		return start_chunk_scene
@@ -577,25 +581,30 @@ func _is_scene_compatible_with_neighbors(scene: PackedScene, grid_pos: Vector2i)
 
 	for direction in ALL_DIRECTIONS:
 		var neighbor_pos: Vector2i = grid_pos + _grid_offset(direction)
-		if not _loaded_chunks.has(neighbor_pos):
+		var neighbor_meta: Dictionary
+		if _chosen_scenes.has(neighbor_pos):
+			neighbor_meta = _get_chunk_meta(_chosen_scenes[neighbor_pos])
+		elif _loaded_chunks.has(neighbor_pos):
+			var neighbor: Node2D = _loaded_chunks[neighbor_pos]
+			neighbor_meta = {"north": neighbor.get("north_connector"), "south": neighbor.get("south_connector"),
+				"east": neighbor.get("east_connector"), "west": neighbor.get("west_connector")}
+		else:
 			continue
-		var neighbor: Node2D = _loaded_chunks[neighbor_pos]
-
 		var candidate_side: int
 		var neighbor_side: int
 		match direction:
 			Direction.NORTH:
 				candidate_side = meta["north"]
-				neighbor_side = neighbor.get("south_connector")
+				neighbor_side = neighbor_meta["south"]
 			Direction.EAST:
 				candidate_side = meta["east"]
-				neighbor_side = neighbor.get("west_connector")
+				neighbor_side = neighbor_meta["west"]
 			Direction.SOUTH:
 				candidate_side = meta["south"]
-				neighbor_side = neighbor.get("north_connector")
+				neighbor_side = neighbor_meta["north"]
 			Direction.WEST:
 				candidate_side = meta["west"]
-				neighbor_side = neighbor.get("east_connector")
+				neighbor_side = neighbor_meta["east"]
 
 		if not _connector_compatible(candidate_side, neighbor_side):
 			return false
@@ -821,7 +830,7 @@ func _get_player() -> Node2D:
 		_player_cached = player_to_follow as Node2D
 		return _player_cached
 	if player_follow_path != "":
-		var np: Node = get_node(player_follow_path)
+		var np: Node = get_node_or_null(player_follow_path)
 		if np is Node2D:
 			_player_cached = np as Node2D
 			return _player_cached

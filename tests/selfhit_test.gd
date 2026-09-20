@@ -60,8 +60,8 @@ func _ready() -> void:
 	for direction in DIRECTIONS:
 		# Reproduz a lógica de Player.update_weapon_holder(): cima -> -1, resto -> 1.
 		_holder.z_index = -1 if direction == "up" else 1
-		_verify_projectile(direction)
-		_verify_muzzle_flash(direction)
+		await _verify_projectile(direction)
+		await _verify_muzzle_flash(direction)
 
 	await _wait(10)
 	_finish()

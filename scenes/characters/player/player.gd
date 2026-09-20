@@ -1,5 +1,7 @@
 extends CharacterBody2D
 
+const MOVE_ACTIONS: Array[String] = ["move_left", "move_right", "move_up", "move_down"]
+
 @export var walk_speed: float = 60.0
 @export var sprint_speed: float = 100.0
 
@@ -23,6 +25,7 @@ var double_tap_sprint_action: String = ""
 func _ready() -> void:
 	# Inicializa a visibilidade dos sprites
 	update_sprite_visibility()
+	update_animation(false)
 
 
 func _physics_process(_delta: float) -> void:
@@ -40,16 +43,12 @@ func _physics_process(_delta: float) -> void:
 
 	if wants_to_attack:
 		start_attack()
-		return
 
 	# Não permite movimento durante o ataque
 	if is_attacking:
 		velocity = Vector2.ZERO
 		move_and_slide()
 		return
-
-	# Detecta duplo toque nas teclas de movimento
-	check_double_tap()
 
 	# Movimento
 	var input_direction := Input.get_vector(
@@ -59,28 +58,22 @@ func _physics_process(_delta: float) -> void:
 		"move_down"
 	)
 
-	# Shift OU duplo toque ativa corrida
-	var is_sprinting := (
-		Input.is_action_pressed("sprint")
-		or double_tap_sprint_action != ""
-	)
-
 	# Se a tecla do duplo toque foi solta, cancela a corrida por duplo toque
 	if double_tap_sprint_action != "":
 		if not Input.is_action_pressed(double_tap_sprint_action):
 			double_tap_sprint_action = ""
 
-	is_sprinting = (
+	var is_sprinting := (
 		Input.is_action_pressed("sprint")
 		or double_tap_sprint_action != ""
 	)
 
-	var current_speed := sprint_speed if is_sprinting else walk_speed
-
-	velocity = input_direction * current_speed
+	velocity = calculate_movement_velocity(input_direction, is_sprinting)
 
 	if input_direction != Vector2.ZERO:
-		last_direction = get_facing_direction(input_direction)
+		# Mantém corpo, empunhadura e cano alinhados durante a recarga.
+		if not equipped_weapon or not equipped_weapon.is_reloading:
+			last_direction = get_facing_direction(input_direction)
 		update_animation(true)
 	else:
 		update_animation(false)
@@ -88,27 +81,28 @@ func _physics_process(_delta: float) -> void:
 	move_and_slide()
 
 
-func check_double_tap() -> void:
-	var actions := [
-		"move_left",
-		"move_right",
-		"move_up",
-		"move_down"
-	]
+func calculate_movement_velocity(input_direction: Vector2, sprinting: bool) -> Vector2:
+	# Input.get_vector já limita a magnitude, preservando também entrada analógica.
+	return input_direction * (sprint_speed if sprinting else walk_speed)
 
-	for action in actions:
-		if Input.is_action_just_pressed(action):
+
+func _input(event: InputEvent) -> void:
+	# Eventos contam cada toque uma vez, mesmo durante ataque/recarga.
+	for action in MOVE_ACTIONS:
+		if event.is_action_released(action):
+			if double_tap_sprint_action == action:
+				double_tap_sprint_action = ""
+		elif event.is_action_pressed(action) and not event.is_echo():
+			for other in MOVE_ACTIONS:
+				if other != action and Input.is_action_pressed(other):
+					# Uma combinação diagonal não é um novo duplo toque.
+					last_move_action = ""
+					return
 			var current_time := Time.get_ticks_msec() / 1000.0
-
-			# Se apertou a mesma tecla duas vezes rapidamente
 			if action == last_move_action and current_time - last_move_time <= double_tap_time:
 				double_tap_sprint_action = action
-
-			# Guarda este toque
 			last_move_action = action
 			last_move_time = current_time
-
-			break
 
 
 func start_attack() -> void:
@@ -118,11 +112,15 @@ func start_attack() -> void:
 	# se o disparo começou de verdade (evita bloqueios com recarga/sem munição).
 	if equipped_weapon:
 		if equipped_weapon.attack(direction_name):
-			is_attacking = true
+			update_animation(false)
+			# Sem frames de tiro, a arma pode terminar sincronamente.
+			is_attacking = equipped_weapon.is_attacking
 			velocity = Vector2.ZERO
 		return
 
 	# Sem arma: usa punch
+	if is_attacking:
+		return
 	is_attacking = true
 	velocity = Vector2.ZERO
 	var animation_name := "punch_" + direction_name
@@ -164,7 +162,7 @@ func update_animation(is_moving: bool) -> void:
 	if equipped_weapon:
 		var no_hands_animation := state + "_" + direction_name
 		if no_hands_sprite.sprite_frames.has_animation(no_hands_animation):
-			if no_hands_sprite.animation != no_hands_animation:
+			if no_hands_sprite.animation != no_hands_animation or not no_hands_sprite.is_playing():
 				no_hands_sprite.play(no_hands_animation)
 
 		equipped_weapon.play_movement_animation(state, direction_name)
@@ -174,7 +172,7 @@ func update_animation(is_moving: bool) -> void:
 	# Sem arma: usa MovimentSprite normal
 	var animation_name := state + "_" + direction_name
 
-	if animated_sprite.animation != animation_name:
+	if animated_sprite.animation != animation_name or not animated_sprite.is_playing():
 		animated_sprite.play(animation_name)
 
 
@@ -191,7 +189,7 @@ func get_direction_name(direction: Vector2) -> String:
 	return "right"
 
 
-## Ajusta z_index, posição da empunhadura e sprite offset da arma.
+## Ajusta a ordem local e a posição da empunhadura.
 ## A posição do Weapon representa o ponto de empunhadura (mão).
 ## O sprite offset é aplicado internamente pela própria Weapon.
 func update_weapon_holder() -> void:
@@ -200,14 +198,15 @@ func update_weapon_holder() -> void:
 
 	var direction_name := get_direction_name(last_direction)
 
-	# Ordem de desenho: mirando para cima, a arma fica atrás do corpo.
-	if direction_name == "up":
-		weapon_holder.z_index = -1
-	else:
-		weapon_holder.z_index = 1
+	# Mesma camada do corpo/props: apenas a ordem interna muda.
+	# Assim a arma participa da composição do Player no Y-sort do mundo.
+	var holder_index := 0 if direction_name == "up" else get_child_count() - 1
+	if weapon_holder.get_index() != holder_index:
+		move_child(weapon_holder, holder_index)
 
-	# A origem do Weapon = ponto da empunhadura (mão do personagem).
-	equipped_weapon.position = equipped_weapon.get_grip_offset(direction_name)
+	# Sprites e holder ordenam nos pés (y=7), sem mudar a composição visual.
+	# grip_offsets continuam relativos à origem lógica do Player.
+	equipped_weapon.position = equipped_weapon.get_grip_offset(direction_name) - weapon_holder.position
 
 
 # --- Sistema de armas ---
@@ -218,10 +217,13 @@ func update_sprite_visibility() -> void:
 
 	animated_sprite.visible = not has_weapon
 	no_hands_sprite.visible = has_weapon
+	weapon_holder.visible = has_weapon
 
 
 ## Equipa uma arma e a coloca no WeaponHolder.
 func equip_weapon(weapon: Weapon) -> void:
+	if weapon == null or weapon == equipped_weapon:
+		return
 	unequip_weapon()
 
 	equipped_weapon = weapon
@@ -238,6 +240,7 @@ func equip_weapon(weapon: Weapon) -> void:
 
 ## Remove a arma equipada do WeaponHolder.
 func unequip_weapon() -> void:
+	is_attacking = false
 	if equipped_weapon:
 		if equipped_weapon.attack_finished.is_connected(_on_weapon_attack_finished):
 			equipped_weapon.attack_finished.disconnect(_on_weapon_attack_finished)

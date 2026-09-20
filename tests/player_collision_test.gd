@@ -28,7 +28,17 @@ func _check_player_scene_shape() -> void:
 		_failures.append("player.tscn não carregou")
 		return
 	var player: Node2D = scene.instantiate()
-	var shape_node: Node2D = player.get_node("CollisionShape2D")
+	var shape_node := player.get_node_or_null("CollisionShape2D") as CollisionShape2D
+	if shape_node == null:
+		_failures.append("Player sem CollisionShape2D nos pes")
+		player.free()
+		return
+	var active_shapes := 0
+	for child in player.get_children():
+		if child is CollisionShape2D and not child.disabled:
+			active_shapes += 1
+	if active_shapes != 1:
+		_failures.append("Player tem colisao adicional fora dos pes")
 	var capsule: CapsuleShape2D = shape_node.shape as CapsuleShape2D
 	if capsule == null:
 		_failures.append("CollisionShape2D do player não é CapsuleShape2D")

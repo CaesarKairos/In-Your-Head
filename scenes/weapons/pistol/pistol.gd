@@ -26,7 +26,7 @@ func _ready() -> void:
     grip_offset = Vector2(0, 4)
     grip_offsets = {
         "down": Vector2(0, 4),
-        "up": Vector2(0, 4),
+        "up": Vector2(4, 0),
         "left": Vector2(-2, 3),
         "right": Vector2(2, 3),
     }
@@ -49,7 +49,7 @@ func _ready() -> void:
     # Boca do cano estimada da Pistol; ajustar visualmente no editor.
     muzzle_offsets = {
         "down": Vector2(0, 8),
-        "up": Vector2(0, -10),
+        "up": Vector2(0, -7),
         "left": Vector2(-6, -2),
         "right": Vector2(6, -2),
     }

@@ -8,10 +8,10 @@ var _failures: Array[String] = []
 
 
 func _ready() -> void:
-    _check_weapon_now("res://scenes/weapons/gun/gun.tscn", "Gun", "res://assets/characters/player/Guns/Bullets/Gun-bullet_Bullet.png", 1400.0, 10)
-    _check_weapon_now("res://scenes/weapons/pistol/pistol.tscn", "Pistol", "res://assets/characters/player/Guns/Bullets/Pistol-bullet_Bullet.png", 1100.0, 6)
-    _check_weapon_now("res://scenes/weapons/shotgun/shotgun.tscn", "Shotgun", "res://assets/characters/player/Guns/Bullets/Shotgun-bullet.png", 900.0, 14)
-    _check_bullet_setup()
+    await _check_weapon_now("res://scenes/weapons/gun/gun.tscn", "Gun", "res://assets/characters/player/Guns/Bullets/Gun-bullet_Bullet.png", 1400.0, 10)
+    await _check_weapon_now("res://scenes/weapons/pistol/pistol.tscn", "Pistol", "res://assets/characters/player/Guns/Bullets/Pistol-bullet_Bullet.png", 1100.0, 6)
+    await _check_weapon_now("res://scenes/weapons/shotgun/shotgun.tscn", "Shotgun", "res://assets/characters/player/Guns/Bullets/Shotgun-bullet.png", 900.0, 14)
+    await _check_bullet_setup()
     await get_tree().create_timer(0.1).timeout
     _finish()
 
@@ -72,4 +72,3 @@ func _finish() -> void:
         for f in _failures:
             print(" - " + f)
     get_tree().quit(1 if _failures.size() > 0 else 0)
-

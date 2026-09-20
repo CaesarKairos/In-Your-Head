@@ -14,7 +14,7 @@ extends RefCounted
 ##    sólidos (18px) e entre árvores (30px), quebrando o padrão quadriculado e
 ##    evitando sobreposição de colisões;
 ##  - Jitter aleatório dentro da célula;
-##  - Variação de escala (0.85–1.15) e flip horizontal;
+##  - Escala nativa e flip horizontal;
 ##  - Mistura de tipos (sorteio ponderado por categoria) num mesmo cluster;
 ##  - Container "Nature" com y_sort_enabled: props mais abaixo na tela desenham
 ##    por cima de props mais acima, complementando a translucidez por oclusão.
@@ -127,7 +127,7 @@ static func scatter(chunk: Node2D, grid_pos: Vector2i, world_seed: int) -> void:
 	var background_coords: Vector2i = bg_value if bg_value != null else Vector2i(5, 0)
 
 	# Coleta células elegíveis: apenas tile de fundo liso (nunca estrada/borda),
-	# pulando a margem de 1 tile para reduzir props cortados na emenda entre chunks.
+	# mantendo margem de 1 tile para separar colisões entre chunks.
 	var eligible: Array[Vector2i] = []
 	for cell in ground.get_used_cells():
 		if cell.x <= 0 or cell.x >= CHUNK_TILES - 1 \
@@ -183,7 +183,7 @@ static func scatter(chunk: Node2D, grid_pos: Vector2i, world_seed: int) -> void:
 static func _jittered_cell_pos(cell: Vector2i, rng: RandomNumberGenerator) -> Vector2:
 	var base := Vector2(cell) * float(TILE_SIZE) + Vector2(TILE_SIZE, TILE_SIZE) * 0.5
 	var j := float(TILE_SIZE) * 0.4
-	return base + Vector2(rng.randf_range(-j, j), rng.randf_range(-j, j))
+	return (base + Vector2(rng.randf_range(-j, j), rng.randf_range(-j, j))).round()
 
 
 ## Verdadeiro se `pos` respeita `min_d` de TODOS os pontos de `list`.
@@ -240,7 +240,7 @@ static func _load_texture(path: String) -> Texture2D:
 
 ## Cria o nó do prop: NatureProp (colisão + oclusão por coordenada) para árvores,
 ## arbustos, tocos e pedras; Sprite2D simples para decoração baixa (grama, flores).
-## Aplica variação de escala e flip horizontal para quebrar a repetição visual.
+## Aplica flip horizontal sem distorcer a escala nativa da pixel art.
 static func _make_prop(texture: Texture2D, kind: String, pos: Vector2, rng: RandomNumberGenerator) -> Node2D:
 	var flip := rng.randf() < 0.5
 	var node: Node2D
@@ -260,7 +260,6 @@ static func _make_prop(texture: Texture2D, kind: String, pos: Vector2, rng: Rand
 		node = sprite
 	# A BASE do prop fica plantada na posição (o "pezinho" no chão).
 	node.position = pos
-	# Variação suave de escala (0.85–1.15), proporcional (sprite + colisão).
-	var s := 0.85 + rng.randf() * 0.3
-	node.scale = Vector2(s, s)
+	# Preserva a sequencia aleatoria, usando a escala nativa da pixel art.
+	rng.randf()
 	return node
